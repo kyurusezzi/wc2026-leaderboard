@@ -700,10 +700,13 @@
             const away = home === a ? b : a;
             const hs = home.score, as = away.score;
             const hasScore = hs != null && hs !== '' && as != null && as !== '';
+            const hp = home.shootoutScore, ap = away.shootoutScore;       // penalty shootout (knockouts)
+            const hasPens = hp != null && hp !== '' && ap != null && ap !== '';
             liveByKey.set(evDay + '|' + pairKey(an, bn), {
               score: hasScore ? (hs + '-' + as) : null,
               state: state,
               minute: (st.detail || st.shortDetail || '').replace(/\s+/g, ' ').trim(),
+              pens: hasPens ? (hp + '-' + ap) : null,                      // ET/penalties: shown live, never scored
             });
           } catch (_) { /* one bad event -> skip */ }
         }
@@ -980,7 +983,8 @@
     if (st === 'live') {
       if (info && info.live && info.live.score) {
         const min = info.live.minute ? ' · ' + esc(info.live.minute) : '';
-        return '<span class="result-chip live-badge">● ' + esc(info.live.score) + min + '</span>';
+        const pens = info.live.pens ? ' · պեն ' + esc(info.live.pens) : ''; // shootout (display-only)
+        return '<span class="result-chip live-badge">● ' + esc(info.live.score) + min + pens + '</span>';
       }
       return '<span class="result-chip live-badge">● ՈՒՂԻՂ</span>';
     }

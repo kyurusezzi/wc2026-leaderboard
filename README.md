@@ -80,6 +80,23 @@ rows are ignored automatically (the app computes totals itself; no totals row ne
 Do **not** use "New deployment" for code edits — that mints a *new* `/exec` URL and breaks the live
 site until you re‑paste it. (This is the #1 mistake.)
 
+### Optional: auto-fill results from ESPN (the 90-minute score)
+
+The script can fill finished results into **column L** for you, so you don't have to type them. It's
+**opt-in** and runs **server-side as you on a timer** — there is no public "write" endpoint, so nobody
+can inject results through the URL. The public read API stays read-only.
+
+- It writes **only the 90-minute (regulation) score**, for **every** stage. For a knockout that goes
+  to extra time or penalties it reads ESPN's per-half data and **sums only the first two halves** —
+  ET goals and shootouts are shown live in the app but **never scored**.
+- It only fills **blank** column-L cells and **never overwrites** a value you typed (so you can always
+  pre-empt or correct it by hand). ESPN finals are usually right but can be provisional (VAR), so a
+  glance now and then is wise.
+
+**Turn it on (once):** in the Apps Script editor, pick **`setupAutoSync`** from the function dropdown
+and click **Run**. Authorize the new permissions it asks for (edit your sheet + fetch external URLs).
+That installs a trigger that runs every 10 minutes. To turn it off, run **`removeAutoSync`**.
+
 ---
 
 ## Part 2 — Publish the dashboard (GitHub Pages)

@@ -227,6 +227,73 @@
     .seg-btn[aria-pressed="true"] { background: var(--accent); color: #0A0F1E; }
     .hl-chip[aria-pressed="true"] { background: var(--accent); color: #0A0F1E; border-color: var(--accent); }
 
+    /* lineup button on a fixture */
+    .lineup-btn {
+      flex: none; width: 24px; height: 24px; border-radius: 7px; font-size: 13px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+      color: var(--text-mid); background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+    }
+    .lineup-btn:hover { color: var(--text-hi); background: rgba(43,212,107,0.12); border-color: rgba(43,212,107,0.35); }
+
+    /* ===== Lineups modal ===== */
+    #lineup-overlay {
+      position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+      padding: 16px; background: rgba(3,9,6,0.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      animation: fade-in .2s ease both;
+    }
+    #lineup-card {
+      position: relative; width: 100%; max-width: 1000px; max-height: 92vh; overflow-y: auto;
+      background: var(--surface-solid); border: 1px solid var(--border); border-radius: 18px;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.6); animation: pop-in .22s cubic-bezier(.22,1,.36,1) both;
+    }
+    #lineup-close {
+      position: sticky; top: 10px; float: right; margin: 10px 10px 0 0; z-index: 2;
+      width: 32px; height: 32px; border-radius: 9999px; cursor: pointer;
+      color: var(--text-hi); background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    }
+    #lineup-close:hover { background: rgba(255,255,255,0.12); }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pop-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+    body.modal-open { overflow: hidden; }
+
+    .lu-head { padding: 18px 20px 6px; }
+    .lu-vs { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+    .lu-team-h { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+    .lu-team-h img { width: 26px; height: 26px; object-fit: contain; }
+    .lu-form { font-size: 12px; font-weight: 700; color: var(--accent-2); }
+    .lu-score { font-size: 13px; color: var(--text-mid); }
+    .lu-pitches { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 8px 16px 4px; }
+    @media (min-width: 1024px) { .lu-pitches { grid-template-columns: 1fr 1fr; } }
+
+    .pitch {
+      position: relative; border-radius: 14px; border: 1px solid rgba(255,255,255,0.10);
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0 14px, rgba(255,255,255,0) 14px 28px),
+        linear-gradient(180deg, #0F3D24, #0B2C1A);
+      padding: 14px 8px; min-height: 360px;
+      display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+    }
+    .pitch::before { /* centre line + circle */
+      content: ""; position: absolute; left: 8px; right: 8px; top: 50%; height: 0; border-top: 1px solid rgba(255,255,255,0.10);
+    }
+    .pitch-line { display: flex; align-items: center; justify-content: space-around; gap: 4px; }
+    .player { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; text-align: center; }
+    .player .marker {
+      position: relative; width: 38px; height: 38px; border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; border: 2px solid rgba(255,255,255,0.55); overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .player .marker img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .player .pname { font-size: 10px; line-height: 1.1; color: #EAF6EE; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lu-subs { padding: 6px 20px 18px; display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 1024px) { .lu-subs { grid-template-columns: 1fr 1fr; } }
+    .lu-subs h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-lo); margin-bottom: 4px; }
+    .lu-sub { font-size: 12px; color: var(--text-mid); display: inline-flex; gap: 5px; padding: 2px 0; }
+    .lu-sub b { color: var(--text-hi); font-variant-numeric: tabular-nums; min-width: 18px; }
+    .lu-msg { padding: 40px 20px; text-align: center; color: var(--text-mid); }
+    .lu-skel { padding: 60px 20px; text-align: center; color: var(--text-lo); }
+
     /* ===== Reduced motion: kill ALL animation paths ===== */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -320,6 +387,14 @@
   <!-- Toasts -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
+  <!-- Lineups modal (tactical pitch) -->
+  <div id="lineup-overlay" class="hidden" role="dialog" aria-modal="true" aria-label="Կազմեր">
+    <div id="lineup-card">
+      <button id="lineup-close" aria-label="Փակել">✕</button>
+      <div id="lineup-body"></div>
+    </div>
+  </div>
+
   <script type="module">
   /* ====================================================================
      WC2026 LIVE LEADERBOARD — single-file dashboard
@@ -342,11 +417,12 @@
     // --- live indicators (idea #1 clock badge + idea #2 ESPN scores) ---
     LIVE_WINDOW_MIN: 130,           // clock-only fallback window after kickoff (when ESPN has no data)
     LIVE_FETCH_WINDOW_MIN: 210,     // keep polling ESPN this long after kickoff (late starts, long stoppage, FT-before-entry)
-    SOON_WINDOW_MIN: 30,            // "starts in Xm" lead-in before kickoff
+    SOON_WINDOW_MIN: 120,           // show "շուտով" + countdown from 2h before kickoff
     LIVE_RETICK_MS: 20000,          // grid-only re-evaluation cadence for time/live states
     YEREVAN_UTC_OFFSET_MIN: 240,    // column D is Asia/Yerevan local = UTC+4, no DST
     LIVE_SCORES: true,              // pull real in-play scores from ESPN (display-only)
     ESPN_SCOREBOARD: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+    ESPN_SUMMARY: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary', // lineups
     SHOW_LIVE_PILL: true,           // header shows "ՈՒՂԻՂ · N խաղ" when matches are in progress
     DEMO: location.search.includes('demo'),
     TEST: location.search.includes('test'),
@@ -589,7 +665,8 @@
     eq('state within-window->live', matchTimeState(t0, t0 + 120 * MIN, false), 'live');
     eq('state past-window->finished', matchTimeState(t0, t0 + 131 * MIN, false), 'finished');
     eq('state 20m-before->soon', matchTimeState(t0, t0 - 20 * MIN, false), 'soon');
-    eq('state 90m-before->upcoming', matchTimeState(t0, t0 - 90 * MIN, false), 'upcoming');
+    eq('state 90m-before->soon', matchTimeState(t0, t0 - 90 * MIN, false), 'soon');     // 2h soon window
+    eq('state 150m-before->upcoming', matchTimeState(t0, t0 - 150 * MIN, false), 'upcoming');
     eq('state null-kickoff->upcoming', matchTimeState(null, t0, false), 'upcoming');
 
     const passed = results.filter((r) => r.ok === '✅').length;
@@ -703,6 +780,7 @@
             const hp = home.shootoutScore, ap = away.shootoutScore;       // penalty shootout (knockouts)
             const hasPens = hp != null && hp !== '' && ap != null && ap !== '';
             liveByKey.set(evDay + '|' + pairKey(an, bn), {
+              id: ev.id,                                                   // ESPN event id (for lineups)
               score: hasScore ? (hs + '-' + as) : null,
               state: state,
               minute: (st.detail || st.shortDetail || '').replace(/\s+/g, ' ').trim(),
@@ -712,6 +790,94 @@
         }
       }
     } finally { liveInFlight = false; }
+  }
+
+  /* ===== LINEUPS (ESPN summary?event=id — keyless, display-only) ===== */
+  // Resolve the ESPN event id for a sheet match: prefer the live cache, else
+  // fetch the scoreboard for the match's Yerevan day(s) and match by team pair.
+  async function resolveEventId(m) {
+    const kickoff = parseKickoff(m.datetime);
+    const home = m.teams && m.teams.home, away = m.teams && m.teams.away;
+    if (!home || !away) return null;
+    const pk = pairKey(home, away);
+    if (kickoff != null) {
+      const hit = liveByKey.get(yerevanDay(kickoff) + '|' + pk);
+      if (hit && hit.id) return hit.id;
+    }
+    // not cached -> fetch the scoreboard for the relevant day(s) and search
+    const days = new Set();
+    if (kickoff != null) { days.add(yerevanDay(kickoff)); days.add(yerevanDay(kickoff - 86400000)); }
+    for (const day of days) {
+      try {
+        const json = await (await fetch(CONFIG.ESPN_SCOREBOARD + '?dates=' + day, { mode: 'cors' })).json();
+        for (const ev of (json && json.events) || []) {
+          const cs = ((ev.competitions && ev.competitions[0]) || {}).competitors || [];
+          if (cs.length !== 2) continue;
+          const an = cs[0].team && (cs[0].team.displayName || cs[0].team.name);
+          const bn = cs[1].team && (cs[1].team.displayName || cs[1].team.name);
+          if (an && bn && pairKey(an, bn) === pk) return ev.id;
+        }
+      } catch (_) { /* skip this day */ }
+    }
+    return null;
+  }
+
+  // Bucket an ESPN position abbreviation into a pitch line. Order matters:
+  // forwards (incl. RF/LF) first, then any 'M' (DM/AM/RM/LM) -> MID, then backs/CD -> DEF.
+  function lineOf(abbr) {
+    const a = String(abbr || '').toUpperCase();
+    if (a[0] === 'G') return 'GK';                                   // G, GK
+    if (/F$/.test(a)) return 'FWD';                                  // F, CF, RF, LF
+    if (a === 'W' || a === 'RW' || a === 'LW' || a === 'S' || a === 'ST') return 'FWD';
+    if (a.indexOf('M') >= 0) return 'MID';                           // CM, DM, AM, RM, LM, M, CDM, CAM
+    if (a.indexOf('B') >= 0 || a.indexOf('D') >= 0 || a === 'SW') return 'DEF'; // RB, LB, WB, CB, CD, D
+    return 'MID';
+  }
+  // left → centre → right within a line (handles RB/LB, RM/LM, RF/LF, CD-R/CD-L)
+  function lrOrder(abbr) {
+    const a = String(abbr || '').toUpperCase();
+    if (/^L/.test(a) || /-L$/.test(a) || /L$/.test(a)) return 0;
+    if (/^R/.test(a) || /-R$/.test(a) || /R$/.test(a)) return 2;
+    return 1;
+  }
+  // contrast text colour for a kit-coloured marker
+  function readableOn(hex) {
+    const h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#fff';
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#0A1F12' : '#ffffff';
+  }
+  function teamFromRoster(t) {
+    const team = t.team || {};
+    const fill = '#' + String((t.uniform && t.uniform.color) || team.color || '6B8A78').replace('#', '');
+    const players = (t.roster || []).map((p) => {
+      const a = p.athlete || {};
+      return {
+        num: p.jersey || '', name: a.displayName || a.shortName || '—',
+        line: lineOf(p.position && p.position.abbreviation), lr: lrOrder(p.position && p.position.abbreviation),
+        place: Number(p.formationPlace) || 99,
+        photo: (a.headshot && a.headshot.href) || null,
+        starter: p.starter === true, subbedIn: !!p.subbedIn, subbedOut: !!p.subbedOut,
+      };
+    });
+    return {
+      name: team.displayName || team.name || '—',
+      crest: (team.logos && team.logos[0] && team.logos[0].href) || team.logo || null,
+      formation: t.formation || '',
+      kit: { fill: fill, text: readableOn(fill) },
+      starters: players.filter((p) => p.starter),
+      subs: players.filter((p) => !p.starter),
+    };
+  }
+  async function fetchLineups(eventId) {
+    const json = await (await fetch(CONFIG.ESPN_SUMMARY + '?event=' + eventId, { mode: 'cors' })).json();
+    const rosters = (json && json.rosters) || [];
+    const withXI = rosters.filter((t) => (t.roster || []).some((p) => p.starter === true));
+    if (withXI.length < 2) return { available: false, teams: [] };
+    // home first
+    const teams = rosters.map(teamFromRoster);
+    teams.sort((a, b) => 0); // keep ESPN order (home, away)
+    return { available: true, teams: teams };
   }
 
   let pollTimer = null;
@@ -821,6 +987,14 @@
     const m = Math.round(s / 60);
     if (m < 60) return m + ' րոպե առաջ';
     return Math.round(m / 60) + ' ժ առաջ';
+  }
+  // "1ժ 30ր-ից" / "45ր-ից" / "Շուտով" — countdown to kickoff for the soon badge
+  function fmtCountdown(mins) {
+    if (mins == null) return 'Շուտով';
+    if (mins < 1) return 'Շուտով';
+    if (mins < 60) return mins + 'ր-ից';
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m ? (h + 'ժ ' + m + 'ր-ից') : (h + 'ժ-ից');
   }
 
   function toast(msg) {
@@ -994,7 +1168,7 @@
     }
     if (st === 'soon') {
       const mins = info && info.kickoff != null ? Math.max(0, Math.round((info.kickoff - Date.now()) / 60000)) : null;
-      return '<span class="result-chip live-badge--soon">⏱ ' + (mins != null ? mins + 'ր-ից' : 'Շուտով') + '</span>';
+      return '<span class="result-chip live-badge--soon">⏱ ' + fmtCountdown(mins) + '</span>';
     }
     return '<span class="result-chip result-chip--pending">⏱ ' + esc(m.datetime || 'Առաջիկա') + '</span>';
   }
@@ -1051,7 +1225,8 @@
     return '<tr>' +
       '<td class="fixture">' +
         '<div class="flex items-center gap-2 mb-1"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
-          '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
+          '<span class="font-semibold text-sm truncate flex-1">' + fixtureLabel(m) + '</span>' +
+          '<button class="lineup-btn" data-lineup="' + m.row + '" title="Կազմեր" aria-label="Կազմեր">👥</button></div>' +
         '<div class="flex items-center gap-2 text-xs" style="color:var(--text-lo)">' +
           (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m, matchLiveInfo(m, now)) + '</div>' +
       '</td>' +
@@ -1083,7 +1258,8 @@
       '<div class="flex items-center justify-between gap-2 mb-2">' +
         '<div class="flex items-center gap-2 min-w-0"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
           '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
-        actualChip(m, matchLiveInfo(m, now)) +
+        '<div class="flex items-center gap-2">' + actualChip(m, matchLiveInfo(m, now)) +
+          '<button class="lineup-btn" data-lineup="' + m.row + '" title="Կազմեր" aria-label="Կազմեր">👥</button></div>' +
       '</div>' +
       '<div class="grid grid-cols-2 gap-2">' +
         cols.map((p) => {
@@ -1169,6 +1345,16 @@
     renderMismatchBanner(vm);
     renderToolbar(vm);
     rerenderView();
+    maybeDeepLinkLineup(vm);  // ?lineup=<row> opens that fixture's lineup once
+  }
+
+  let _lineupDeepLinked = false;
+  function maybeDeepLinkLineup(vm) {
+    if (_lineupDeepLinked) return;
+    const row = Number(new URLSearchParams(location.search).get('lineup'));
+    if (!row) return;
+    const match = vm.matchViews.find((m) => m.row === row);
+    if (match) { _lineupDeepLinked = true; openLineups(match); }
   }
 
   function rerenderView() {
@@ -1207,6 +1393,77 @@
   let _toasted = '';
   function toastOnce(msg) { if (msg && msg !== _toasted) { _toasted = msg; toast('Միացման սխալ — ' + msg); } }
 
+  /* ===== Lineups modal render + open/close ======================== */
+  function playerMarkerHtml(p, kit) {
+    // kit-coloured numbered marker is the base; a photo (if any) overlays it and
+    // is dropped on load error -> the number shows through. So no broken images.
+    const img = p.photo ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy" onerror="this.remove()">' : '';
+    const sub = p.subbedOut ? ' ↓' : '';
+    return '<div class="player"><div class="marker" style="background:' + kit.fill + ';color:' + kit.text + '">' +
+           esc(p.num || '') + img + '</div>' +
+           '<div class="pname">' + esc(p.name) + sub + '</div></div>';
+  }
+  function pitchHtml(team) {
+    const byLine = { GK: [], DEF: [], MID: [], FWD: [] };
+    team.starters.forEach((p) => { (byLine[p.line] || byLine.MID).push(p); });
+    Object.keys(byLine).forEach((L) => byLine[L].sort((a, b) => a.lr - b.lr || a.place - b.place));
+    // attack at top -> GK at bottom
+    const rows = ['FWD', 'MID', 'DEF', 'GK'].map((L) =>
+      '<div class="pitch-line">' + byLine[L].map((p) => playerMarkerHtml(p, team.kit)).join('') + '</div>'
+    ).join('');
+    return '<div class="pitch">' + rows + '</div>';
+  }
+  function subsHtml(team) {
+    return '<div><h4>' + esc(team.name) + ' · փոխ.</h4>' +
+      (team.subs.length
+        ? team.subs.map((p) => '<div class="lu-sub"><b>' + esc(p.num || '') + '</b>' + esc(p.name) + (p.subbedIn ? ' ↑' : '') + '</div>').join('')
+        : '<div class="lu-sub">—</div>') + '</div>';
+  }
+  function teamHeadHtml(team) {
+    return '<div class="lu-team-h">' + (team.crest ? '<img src="' + esc(team.crest) + '" alt="">' : '') +
+      '<span>' + esc(team.name) + '</span>' + (team.formation ? ' <span class="lu-form">' + esc(team.formation) + '</span>' : '') + '</div>';
+  }
+  function renderLineupContent(match, result, info) {
+    if (!result || !result.available || result.teams.length < 2) {
+      refs.lineupBody.innerHTML = '<div class="lu-msg">📋<br>Կազմերը հրապարակվում են խաղից ~1 ժ առաջ։<br><span style="color:var(--text-lo)">' +
+        esc(fixtureTitle(match)) + '</span></div>';
+      return;
+    }
+    const [a, b] = result.teams;
+    const score = match.played ? ('✓ ' + esc(match.actual)) : (info && info.live && info.live.score ? '● ' + esc(info.live.score) : '');
+    refs.lineupBody.innerHTML =
+      '<div class="lu-head"><div class="lu-vs">' + teamHeadHtml(a) +
+        '<span class="lu-score">' + score + '</span>' + teamHeadHtml(b) + '</div></div>' +
+      '<div class="lu-pitches">' + pitchHtml(a) + pitchHtml(b) + '</div>' +
+      '<div class="lu-subs">' + subsHtml(a) + subsHtml(b) + '</div>';
+  }
+  function fixtureTitle(m) {
+    return (m.teams && m.teams.home && m.teams.away) ? (m.teams.home + ' – ' + m.teams.away) : (m.matchup || 'Խաղ ' + m.row);
+  }
+  let lineupReqId = 0;
+  function openLineups(match) {
+    if (!match) return;
+    const my = ++lineupReqId;
+    refs.lineupBody.innerHTML = '<div class="lu-skel">⚽ Բեռնում…<br><span>' + esc(fixtureTitle(match)) + '</span></div>';
+    refs.lineupOverlay.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    (async () => {
+      let result = null;
+      try {
+        const id = await resolveEventId(match);
+        if (id) result = await fetchLineups(id);
+      } catch (_) { result = null; }
+      if (my !== lineupReqId) return; // a newer open superseded this one
+      const info = lastVM ? matchLiveInfo(match, Date.now()) : null;
+      renderLineupContent(match, result, info);
+    })();
+  }
+  function closeLineups() {
+    lineupReqId++; // invalidate any in-flight render
+    refs.lineupOverlay.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  }
+
   /* ===== 10. MAIN (wire refs · listeners · boot · poll) =========== */
   function cacheRefs() {
     Object.assign(refs, {
@@ -1218,7 +1475,18 @@
       toolbar: $('#grid-toolbar'), hlChips: $('#hl-chips'),
       gridDesktop: $('#grid-desktop'), gridMobile: $('#grid-mobile'),
       mismatchBanner: $('#mismatch-banner'), toasts: $('#toast-container'),
+      lineupOverlay: $('#lineup-overlay'), lineupCard: $('#lineup-card'),
+      lineupClose: $('#lineup-close'), lineupBody: $('#lineup-body'),
     });
+  }
+
+  // open the lineup modal for a clicked fixture (event delegation — grids re-render wholesale)
+  function onGridClick(e) {
+    const btn = e.target.closest('[data-lineup]');
+    if (!btn || !lastVM) return;
+    const row = Number(btn.dataset.lineup);
+    const match = lastVM.matchViews.find((m) => m.row === row);
+    if (match) openLineups(match);
   }
 
   function boot() {
@@ -1246,6 +1514,13 @@
     setInterval(() => { const s = store.get(); if (s.fetchedAt) renderHeader(s); }, 1000); // tick "x ago" + live pill
     setInterval(retickLive, CONFIG.LIVE_RETICK_MS);  // live scores + time-state flips (grid-only)
     setTimeout(retickLive, 1500);                    // prompt first live-score pull after initial paint
+
+    // lineups modal wiring
+    refs.gridDesktop.addEventListener('click', onGridClick);
+    refs.gridMobile.addEventListener('click', onGridClick);
+    refs.lineupClose.addEventListener('click', closeLineups);
+    refs.lineupOverlay.addEventListener('click', (e) => { if (e.target === refs.lineupOverlay) closeLineups(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !refs.lineupOverlay.classList.contains('hidden')) closeLineups(); });
   }
 
   /* ===== DEMO DATA (only used with ?demo) ========================= */

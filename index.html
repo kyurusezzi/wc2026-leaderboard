@@ -237,9 +237,11 @@
 
     /* ===== Lineups modal ===== */
     #lineup-overlay {
-      position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+      position: fixed; inset: 0; z-index: 60; display: none;  /* default hidden (ID beats .hidden) */
       padding: 16px; background: rgba(3,9,6,0.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-      animation: fade-in .2s ease both;
+    }
+    #lineup-overlay:not(.hidden) {  /* shown only when the 'hidden' class is absent */
+      display: flex; align-items: center; justify-content: center; animation: fade-in .2s ease both;
     }
     #lineup-card {
       position: relative; width: 100%; max-width: 1000px; max-height: 92vh; overflow-y: auto;

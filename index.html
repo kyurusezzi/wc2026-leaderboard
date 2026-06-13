@@ -14,19 +14,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <style>
-    /* ===== Palette (CSS custom properties — reliable, not Tailwind arbitrary) ===== */
+    /* ===== Palette — Pitch / stadium green (CSS custom properties) ===== */
     :root {
-      --bg-0: #0A0F1E;
-      --bg-1: #0E1428;
-      --surface: rgba(21, 29, 51, 0.60);
-      --surface-solid: #141C33;
-      --border: #26304D;
-      --border-soft: #1C2640;
-      --text-hi: #F2F5FF;
-      --text-mid: #A9B4D0;
-      --text-lo: #6B769A;
-      --accent: #6D8BFF;
-      --accent-2: #22D3EE;
+      --bg-0: #06140C;            /* very dark grass */
+      --bg-1: #0A1E12;
+      --surface: rgba(12, 32, 20, 0.62);
+      --surface-solid: #0E2417;
+      --border: #1E3A28;
+      --border-soft: #16291C;
+      --text-hi: #F0FBF4;
+      --text-mid: #A7C4B2;
+      --text-lo: #6B8A78;
+      --accent: #2BD46B;          /* grass green */
+      --accent-2: #9DF3C0;        /* pitch highlight / mint */
+      --line: rgba(232, 255, 240, 0.05); /* faint white pitch markings */
       --gold: #FFC850;
       --silver: #C9D2E4;
       --bronze: #E0915A;
@@ -41,18 +42,33 @@
     html { scroll-behavior: smooth; }
     body {
       font-family: "Noto Sans Armenian", "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: var(--bg-0);
+      /* faint mowed-grass stripes over the dark field */
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 64px, rgba(0,0,0,0) 64px 128px),
+        var(--bg-0);
       color: var(--text-hi);
       min-height: 100vh;
     }
+    /* stadium floodlight glow (green) */
     body::before {
       content: "";
       position: fixed;
       inset: 0;
       background:
-        radial-gradient(1200px 600px at 50% -12%, #16213F 0%, rgba(10,15,30,0) 60%),
-        radial-gradient(900px 500px at 100% 0%, rgba(34,211,238,0.08) 0%, rgba(10,15,30,0) 55%),
-        radial-gradient(900px 500px at 0% 10%, rgba(109,139,255,0.10) 0%, rgba(10,15,30,0) 55%);
+        radial-gradient(1200px 600px at 50% -12%, #0E3A22 0%, rgba(6,20,12,0) 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(43,212,107,0.07) 0%, rgba(6,20,12,0) 55%),
+        radial-gradient(900px 500px at 0% 10%, rgba(43,212,107,0.09) 0%, rgba(6,20,12,0) 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* faint pitch center-circle peeking behind the header */
+    body::after {
+      content: "";
+      position: fixed;
+      top: -170px; left: 50%; transform: translateX(-50%);
+      width: 400px; height: 400px;
+      border: 2px solid var(--line);
+      border-radius: 9999px;
       pointer-events: none;
       z-index: 0;
     }
@@ -67,13 +83,13 @@
 
     /* ===== Live status dot ===== */
     .dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
-    .dot--live { background: var(--accent-2); box-shadow: 0 0 0 0 rgba(34,211,238,0.7); animation: pulse 1.8s infinite; }
+    .dot--live { background: var(--accent); box-shadow: 0 0 0 0 rgba(43,212,107,0.7); animation: pulse 1.8s infinite; }
     .dot--busy { background: var(--gold); }
     .dot--off  { background: var(--text-lo); }
     @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(34,211,238,0.55); }
-      70%  { box-shadow: 0 0 0 8px rgba(34,211,238,0); }
-      100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+      0%   { box-shadow: 0 0 0 0 rgba(43,212,107,0.55); }
+      70%  { box-shadow: 0 0 0 8px rgba(43,212,107,0); }
+      100% { box-shadow: 0 0 0 0 rgba(43,212,107,0); }
     }
 
     /* ===== Leaderboard rows + FLIP ===== */
@@ -139,8 +155,8 @@
     .group-badge {
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px;
-      font-size: 11px; font-weight: 800; color: var(--accent-2);
-      background: rgba(34,211,238,0.10); border: 1px solid rgba(34,211,238,0.3);
+      font-size: 11px; font-weight: 800; color: var(--accent);
+      background: rgba(43,212,107,0.12); border: 1px solid rgba(43,212,107,0.35);
     }
     .result-chip {
       display: inline-flex; align-items: center; gap: 4px;
@@ -192,7 +208,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl sm:text-4xl">⚽</div>
         <div>
-          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">WC2026 <span style="color:var(--accent-2)">հաշիվգուշակոցի</span></h1>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">WC2026 <span style="color:var(--accent)">հաշիվգուշակոցի</span></h1>
           <p class="text-sm" style="color:var(--text-mid)">Կենդանի աղյուսակ · 2026 Աշխարհի առաջնություն</p>
         </div>
       </div>

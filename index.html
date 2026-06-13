@@ -175,6 +175,8 @@
       box-shadow: 0 0 0 0 rgba(34,197,94,0.7); animation: pulse 1.8s infinite;
     }
     .live-badge--soon { color: #0A0F1E; font-weight: 800; border-color: transparent; background: var(--gold); }
+    /* ESPN full-time, official column-L result not entered yet (no pulse, distinct from the ✓ official chip) */
+    .live-badge--ft { color: var(--c-exact); font-weight: 800; background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.45); }
 
     /* stage / round grouping (idea: dynamic tournament) */
     #grid-desktop tr.stage-row td {
@@ -338,7 +340,8 @@
     LOCALE: 'hy-AM',
     HIDE_UPCOMING_PREDICTIONS: false, // flip to true to hide picks until kickoff
     // --- live indicators (idea #1 clock badge + idea #2 ESPN scores) ---
-    LIVE_WINDOW_MIN: 115,           // a match counts as "live" for this long after kickoff (90+HT+stoppage)
+    LIVE_WINDOW_MIN: 130,           // clock-only fallback window after kickoff (when ESPN has no data)
+    LIVE_FETCH_WINDOW_MIN: 210,     // keep polling ESPN this long after kickoff (late starts, long stoppage, FT-before-entry)
     SOON_WINDOW_MIN: 30,            // "starts in Xm" lead-in before kickoff
     LIVE_RETICK_MS: 20000,          // grid-only re-evaluation cadence for time/live states
     YEREVAN_UTC_OFFSET_MIN: 240,    // column D is Asia/Yerevan local = UTC+4, no DST
@@ -583,7 +586,8 @@
     eq('state played->finished', matchTimeState(t0, t0 + 10 * MIN, true), 'finished');
     eq('state at kickoff->live', matchTimeState(t0, t0, false), 'live');
     eq('state mid->live', matchTimeState(t0, t0 + 60 * MIN, false), 'live');
-    eq('state just-after-window->finished', matchTimeState(t0, t0 + 116 * MIN, false), 'finished');
+    eq('state within-window->live', matchTimeState(t0, t0 + 120 * MIN, false), 'live');
+    eq('state past-window->finished', matchTimeState(t0, t0 + 131 * MIN, false), 'finished');
     eq('state 20m-before->soon', matchTimeState(t0, t0 - 20 * MIN, false), 'soon');
     eq('state 90m-before->upcoming', matchTimeState(t0, t0 - 90 * MIN, false), 'upcoming');
     eq('state null-kickoff->upcoming', matchTimeState(null, t0, false), 'upcoming');
@@ -948,21 +952,24 @@
   // which would force a re-sort/FLIP just to refresh a badge). ESPN corrects the clock guess.
   function matchLiveInfo(m, now) {
     const kickoff = parseKickoff(m.datetime);
-    let state = matchTimeState(kickoff, now, m.played);
+    if (m.played) return { state: 'finished', kickoff, live: null }; // official result in column L wins
+    // ESPN state is authoritative whenever we have it (the scheduled clock drifts:
+    // late kickoffs + long stoppage make a clock-only window unreliable).
     let live = null;
-    if (CONFIG.LIVE_SCORES && !m.played && (state === 'live' || state === 'soon')) {
+    if (CONFIG.LIVE_SCORES) {
       const day = kickoff != null ? yerevanDay(kickoff) : null;
       const home = m.teams && m.teams.home, away = m.teams && m.teams.away;
       if (day && home && away) {
         const hit = liveByKey.get(day + '|' + pairKey(home, away));
-        if (hit) {
-          live = hit;
-          if (hit.state === 'in') state = 'live';
-          else if (hit.state === 'post') state = 'finished';        // ended per ESPN, awaiting column L
-          else if (hit.state === 'pre' && state === 'live') state = 'soon'; // not kicked off yet per ESPN
-        }
+        if (hit) live = hit;
       }
     }
+    const clock = matchTimeState(kickoff, now, false);
+    let state;
+    if (live && live.state === 'in') state = 'live';          // in progress per ESPN — overrides the clock
+    else if (live && live.state === 'post') state = 'ended';  // full time per ESPN, awaiting column L
+    else if (live && live.state === 'pre') state = (clock === 'live') ? 'soon' : clock; // not kicked off yet
+    else state = clock;                                       // no ESPN data → pure clock fallback
     return { state, kickoff, live };
   }
 
@@ -976,6 +983,10 @@
         return '<span class="result-chip live-badge">● ' + esc(info.live.score) + min + '</span>';
       }
       return '<span class="result-chip live-badge">● ՈՒՂԻՂ</span>';
+    }
+    if (st === 'ended' && info && info.live && info.live.score) {
+      // ESPN says full time but the official column-L result isn't entered yet
+      return '<span class="result-chip live-badge--ft">ԱՎԱՐՏ · ' + esc(info.live.score) + '</span>';
     }
     if (st === 'soon') {
       const mins = info && info.kickoff != null ? Math.max(0, Math.round((info.kickoff - Date.now()) / 60000)) : null;
@@ -1174,8 +1185,12 @@
     for (const m of lastVM.matchViews) {
       if (m.played) continue;
       const k = parseKickoff(m.datetime);
-      const st = matchTimeState(k, now, false);
-      if (st === 'live' || st === 'soon') { hasTimed = true; if (k != null) liveDays.add(yerevanDay(k)); }
+      if (k == null) continue;
+      // poll ESPN from 30m before kickoff through LIVE_FETCH_WINDOW_MIN after — covers late
+      // starts, long stoppage, and the gap between full-time and entering the result in column L.
+      if (now >= k - CONFIG.SOON_WINDOW_MIN * 60000 && now <= k + CONFIG.LIVE_FETCH_WINDOW_MIN * 60000) {
+        hasTimed = true; liveDays.add(yerevanDay(k));
+      }
     }
     if (!hasTimed) return; // nothing time-sensitive on screen → skip the re-render
     if (CONFIG.LIVE_SCORES && liveDays.size) {

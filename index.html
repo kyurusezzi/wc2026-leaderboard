@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WC2026 հաշիվգուշակոցի</title>
+  <meta name="description" content="Live leaderboard for the 2026 World Cup score-prediction pool." />
+
+  <!-- Tailwind Play CDN (zero build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Armenian-friendly font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ===== Palette (CSS custom properties — reliable, not Tailwind arbitrary) ===== */
+    :root {
+      --bg-0: #0A0F1E;
+      --bg-1: #0E1428;
+      --surface: rgba(21, 29, 51, 0.60);
+      --surface-solid: #141C33;
+      --border: #26304D;
+      --border-soft: #1C2640;
+      --text-hi: #F2F5FF;
+      --text-mid: #A9B4D0;
+      --text-lo: #6B769A;
+      --accent: #6D8BFF;
+      --accent-2: #22D3EE;
+      --gold: #FFC850;
+      --silver: #C9D2E4;
+      --bronze: #E0915A;
+      /* outcome colors */
+      --c-exact: #22C55E;
+      --c-draw: #F59E0B;
+      --c-outcome: #84CC16;
+      --c-miss: #EF4444;
+      --c-pending: #475569;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Noto Sans Armenian", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg-0);
+      color: var(--text-hi);
+      min-height: 100vh;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(1200px 600px at 50% -12%, #16213F 0%, rgba(10,15,30,0) 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(34,211,238,0.08) 0%, rgba(10,15,30,0) 55%),
+        radial-gradient(900px 500px at 0% 10%, rgba(109,139,255,0.10) 0%, rgba(10,15,30,0) 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .num { font-variant-numeric: tabular-nums; }
+
+    .glass {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* ===== Live status dot ===== */
+    .dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
+    .dot--live { background: var(--accent-2); box-shadow: 0 0 0 0 rgba(34,211,238,0.7); animation: pulse 1.8s infinite; }
+    .dot--busy { background: var(--gold); }
+    .dot--off  { background: var(--text-lo); }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34,211,238,0.55); }
+      70%  { box-shadow: 0 0 0 8px rgba(34,211,238,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+    }
+
+    /* ===== Leaderboard rows + FLIP ===== */
+    .rank-row { will-change: transform; }
+    .bar-track { background: rgba(255,255,255,0.06); border-radius: 9999px; overflow: hidden; height: 8px; }
+    .bar-fill {
+      height: 100%; border-radius: 9999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width .7s cubic-bezier(.22,1,.36,1);
+    }
+    .rank-row[data-rank="1"] .bar-fill { background: linear-gradient(90deg, var(--gold), #FFE08A); }
+    .rank-row[data-rank="2"] .bar-fill { background: linear-gradient(90deg, var(--silver), #EAF0FB); }
+    .rank-row[data-rank="3"] .bar-fill { background: linear-gradient(90deg, var(--bronze), #F2B583); }
+    .medal { font-weight: 800; }
+    .rank-row[data-rank="1"] .medal { color: var(--gold); }
+    .rank-row[data-rank="2"] .medal { color: var(--silver); }
+    .rank-row[data-rank="3"] .medal { color: var(--bronze); }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 9999px;
+      border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+    }
+    .chip-exact   { color: var(--c-exact); }
+    .chip-draw    { color: var(--c-draw); }
+    .chip-outcome { color: var(--c-outcome); }
+    .chip-mismatch { color: var(--c-draw); border-color: var(--c-draw); }
+
+    /* ===== Match grid cells ===== */
+    .cell {
+      position: relative; text-align: center; padding: 8px 6px; border-radius: 10px;
+      font-weight: 700; font-size: 14px; line-height: 1.1;
+      border: 1px solid transparent; transition: opacity .25s ease, transform .25s ease;
+    }
+    .cell .pbadge {
+      position: absolute; top: 2px; right: 4px; font-size: 9px; font-weight: 700; opacity: .85;
+    }
+    .cell .pred { letter-spacing: .3px; }
+    .cell--exact   { background: rgba(34,197,94,0.16);  color: #BBF7D0; border-color: rgba(34,197,94,0.5); box-shadow: 0 0 0 1px rgba(34,197,94,0.35), 0 0 14px rgba(34,197,94,0.18); }
+    .cell--draw    { background: rgba(245,158,11,0.16);  color: #FDE68A; border-color: rgba(245,158,11,0.45); }
+    .cell--outcome { background: rgba(132,204,22,0.14);  color: #D9F99D; border-color: rgba(132,204,22,0.40); }
+    .cell--miss    { background: rgba(239,68,68,0.13);   color: #FCA5A5; border-color: rgba(239,68,68,0.35); }
+    .cell--pending { background: rgba(71,85,105,0.16);   color: var(--text-lo); border-color: rgba(71,85,105,0.35); opacity: .8; }
+    .cell.is-dim { opacity: .28; }
+
+    /* ===== Desktop matrix sticky header + first column ===== */
+    #grid-desktop table { border-collapse: separate; border-spacing: 6px; }
+    #grid-desktop thead th {
+      position: sticky; top: 0; z-index: 3;
+      background: var(--surface-solid);
+      color: var(--text-mid); font-weight: 600; font-size: 13px;
+      padding: 10px 8px; border-radius: 10px; white-space: nowrap;
+    }
+    #grid-desktop thead th.is-dim { opacity: .35; }
+    #grid-desktop td.fixture, #grid-desktop th.corner {
+      position: sticky; left: 0; z-index: 2;
+      background: var(--surface-solid); /* SOLID — no see-through during horizontal scroll */
+      box-shadow: 6px 0 12px -6px rgba(0,0,0,0.6);
+      min-width: 210px; max-width: 240px; text-align: left;
+      border-radius: 10px; padding: 8px 10px;
+    }
+    #grid-desktop th.corner { z-index: 4; top: 0; }
+    .group-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px;
+      font-size: 11px; font-weight: 800; color: var(--accent-2);
+      background: rgba(34,211,238,0.10); border: 1px solid rgba(34,211,238,0.3);
+    }
+    .result-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 9999px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-hi);
+    }
+    .result-chip--pending { color: var(--text-lo); }
+
+    /* ===== Tooltip (CSS, zero-dependency) ===== */
+    .tip { position: relative; }
+    .tip:hover::after, .tip:focus-visible::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: #0B1124; color: var(--text-hi); border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;
+      white-space: nowrap; z-index: 30; pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    /* ===== Skeleton shimmer ===== */
+    .skel { background: linear-gradient(90deg, #131A2E 25%, #1B2540 37%, #131A2E 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 10px; }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+    /* ===== Toast ===== */
+    .toast {
+      background: var(--surface-solid); border: 1px solid var(--border); color: var(--text-hi);
+      padding: 10px 14px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      font-size: 14px; display: flex; align-items: center; gap: 10px;
+      animation: toast-in .3s ease both;
+    }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .seg-btn { transition: background .2s, color .2s; }
+    .seg-btn[aria-pressed="true"] { background: var(--accent); color: #0A0F1E; }
+    .hl-chip[aria-pressed="true"] { background: var(--accent); color: #0A0F1E; border-color: var(--accent); }
+
+    /* ===== Reduced motion: kill ALL animation paths ===== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      .bar-fill { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+
+    <!-- ===== Header ===== -->
+    <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <div class="text-3xl sm:text-4xl">⚽</div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">WC2026 <span style="color:var(--accent-2)">հաշիվգուշակոցի</span></h1>
+          <p class="text-sm" style="color:var(--text-mid)">Կենդանի աղյուսակ · 2026 Աշխարհի առաջնություն</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="status-pill" class="glass rounded-full px-3 py-1.5 flex items-center gap-2 text-sm">
+          <span id="status-dot" class="dot dot--busy"></span>
+          <span id="status-label" style="color:var(--text-mid)">Բեռնում…</span>
+        </div>
+        <div class="text-right hidden sm:block">
+          <div id="updated-rel" class="text-xs" style="color:var(--text-mid)">—</div>
+          <div id="updated-abs" class="text-[11px]" style="color:var(--text-lo)"></div>
+        </div>
+        <button id="refresh-btn" title="Թարմացնել" aria-label="Թարմացնել"
+          class="glass rounded-full w-10 h-10 flex items-center justify-center hover:bg-white/5 transition">
+          <span id="refresh-icon" class="text-lg">⟳</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== Mismatch banner (hidden by default) ===== -->
+    <div id="mismatch-banner" class="hidden glass rounded-xl px-4 py-3 mb-5 text-sm" style="border-color:var(--c-draw);color:var(--c-draw)"></div>
+
+    <!-- ===== Config-needed notice (hidden by default) ===== -->
+    <div id="config-needed" class="hidden glass rounded-2xl p-6 text-center">
+      <div class="text-2xl mb-2">🔌</div>
+      <h2 class="text-lg font-bold mb-1">Միացրեք ձեր տվյալները</h2>
+      <p class="text-sm mb-4" style="color:var(--text-mid)">
+        Տեղադրեք ձեր Apps Script Web App‑ի հղումը <code class="px-1.5 py-0.5 rounded bg-white/10">CONFIG.WEB_APP_URL</code>‑ում
+        (տես <code class="px-1.5 py-0.5 rounded bg-white/10">README.md</code>)։
+      </p>
+      <a href="?demo" class="inline-block rounded-full px-5 py-2 font-semibold" style="background:var(--accent);color:#0A0F1E">Դիտել դեմո ▶</a>
+    </div>
+
+    <!-- ===== Skeleton (cold start) ===== -->
+    <div id="skeleton">
+      <div class="skel h-48 rounded-2xl mb-6"></div>
+      <div class="skel h-96 rounded-2xl"></div>
+    </div>
+
+    <!-- ===== Content ===== -->
+    <main id="content" class="hidden space-y-6">
+      <!-- Leaderboard -->
+      <section class="glass rounded-2xl p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold flex items-center gap-2">🏆 Աղյուսակ</h2>
+          <div class="flex items-center gap-3 text-xs" style="color:var(--text-lo)">
+            <span class="flex items-center gap-1"><span style="color:var(--c-exact)">◆</span> Ճշգրիտ·3</span>
+            <span class="flex items-center gap-1"><span style="color:var(--c-draw)">≈</span> Ոչ‑ոքի·2</span>
+            <span class="flex items-center gap-1"><span style="color:var(--c-outcome)">▲</span> Ելք·1</span>
+          </div>
+        </div>
+        <ol id="leaderboard" class="space-y-2"></ol>
+      </section>
+
+      <!-- Stats strip -->
+      <section id="stats-strip" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></section>
+
+      <!-- Match grid -->
+      <section class="glass rounded-2xl p-4 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 class="text-lg font-bold flex items-center gap-2">📋 Խաղ առ խաղ</h2>
+          <div id="grid-toolbar" class="flex flex-wrap items-center gap-2"></div>
+        </div>
+        <div id="hl-chips" class="flex flex-wrap items-center gap-2 mb-4"></div>
+        <div id="grid-desktop" class="hidden lg:block overflow-x-auto -mx-2 px-2"></div>
+        <div id="grid-mobile" class="lg:hidden space-y-3"></div>
+      </section>
+    </main>
+
+    <footer class="mt-10 text-center text-xs" style="color:var(--text-lo)">
+      <span id="footer-note">Տվյալները թարմացվում են ինքնաշխատ</span> · WC2026
+    </footer>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+  <script type="module">
+  /* ====================================================================
+     WC2026 LIVE LEADERBOARD — single-file dashboard
+     Sections: 1 CONFIG · 2 data · 3 scoring · 4 tests · 5 state/viewmodel
+               6 ui-helpers · 7 header · 8 leaderboard · 9 grid · 10 main
+     ==================================================================== */
+
+  /* ===== 1. CONFIG ================================================== */
+  const CONFIG = {
+    // Paste your Apps Script Web App /exec URL here (see README.md):
+    WEB_APP_URL: 'PASTE_WEB_APP_EXEC_URL_HERE',
+    POLL_MS: 45000,                 // live refresh cadence
+    REQUEST_TIMEOUT_MS: 12000,
+    BACKOFF_MAX_MS: 5 * 60 * 1000,
+    CACHE_KEY: 'wc2026:lastGood:v1',
+    STALE_AFTER_MS: 2 * 45000,      // older than 2x poll = stale
+    TZ: 'Asia/Yerevan',
+    LOCALE: 'hy-AM',
+    HIDE_UPCOMING_PREDICTIONS: false, // flip to true to hide picks until kickoff
+    DEMO: location.search.includes('demo'),
+    TEST: location.search.includes('test'),
+  };
+
+  const PLAYER_KEYS = ['garik','khazhak','sasha','arman','parthev','vahe','artyom'];
+
+  /* ===== 3. SCORING ENGINE (pure — no DOM/fetch/clock) ============== */
+  // Exported-ish so the test harness + node check can exercise them.
+
+  function parseScore(text) {
+    if (text == null) return null;
+    let s = String(text);
+    // full-width digits -> ASCII
+    s = s.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+    // any dash-like / separator -> ASCII hyphen
+    s = s.replace(/[‒–—―−:/]/g, '-');
+    const m = s.match(/^\D*(\d{1,3})\s*-\s*(\d{1,3})\D*$/);
+    if (!m) return null;
+    const home = Number(m[1]), away = Number(m[2]);
+    if (home > 99 || away > 99) return null;
+    return { home, away };
+  }
+
+  function scoreOne(predText, actualText) {
+    const a = parseScore(actualText);
+    if (a === null) return { points: 0, category: 'pending' }; // FIRST: unplayed -> grey, never red
+    const p = parseScore(predText);
+    if (p === null) return { points: 0, category: 'miss' };
+    if (p.home === a.home && p.away === a.away) return { points: 3, category: 'exact' }; // exact draw = 3, not 2
+    const po = Math.sign(p.home - p.away), ao = Math.sign(a.home - a.away);
+    if (po === 0 && ao === 0) return { points: 2, category: 'draw' };
+    if (po === ao && po !== 0) return { points: 1, category: 'outcome' };
+    return { points: 0, category: 'miss' };
+  }
+
+  function aggregatePlayer(player, matches) {
+    const counts = { exact: 0, draw: 0, outcome: 0, miss: 0, pending: 0 };
+    let total = 0;
+    const perMatch = [];
+    for (const m of matches) {
+      const { points, category } = scoreOne(m.predictions[player.key], m.actual);
+      total += points;
+      counts[category]++;
+      perMatch.push({ row: m.row, points, category });
+    }
+    const sheetTotal = player.sheetTotal;
+    const sheetMismatch = sheetTotal != null && Number(sheetTotal) !== total;
+    return {
+      key: player.key, name: player.name, index: player.index,
+      total, counts, perMatch, sheetTotal: sheetTotal == null ? null : Number(sheetTotal), sheetMismatch,
+    };
+  }
+
+  function rankCompare(a, b) {
+    return (b.total - a.total)
+        || (b.counts.exact - a.counts.exact)
+        || (b.counts.draw - a.counts.draw)
+        || (b.counts.outcome - a.counts.outcome)
+        || (a.index - b.index); // stable, never splits displayed rank
+  }
+
+  function computeStandings(payload) {
+    const players = payload.players || [];
+    const matches = payload.matches || [];
+    const sheetTotals = payload.sheetTotals || {};
+
+    const standings = players.map((p, index) =>
+      aggregatePlayer({ ...p, index, sheetTotal: sheetTotals[p.key] }, matches));
+
+    const sorted = standings.slice().sort(rankCompare);
+
+    // competition ranks (1,2,2,4) — equal {total,exact,draw,outcome} share a rank
+    let displayed = 0, seen = 0, prevKey = null;
+    for (const s of sorted) {
+      seen++;
+      const key = s.total + '|' + s.counts.exact + '|' + s.counts.draw + '|' + s.counts.outcome;
+      if (key !== prevKey) { displayed = seen; prevKey = key; }
+      s.rank = displayed;
+    }
+
+    const maxTotal = standings.reduce((mx, s) => Math.max(mx, s.total), 0);
+    const playedCount = matches.filter((m) => m.played).length;
+    const mismatchCount = standings.filter((s) => s.sheetMismatch).length;
+
+    const matchViews = matches.map((m) => ({
+      row: m.row, group: m.group, matchup: m.matchup, teams: m.teams,
+      datetime: m.datetime, weekday: m.weekday, actual: m.actual, played: m.played,
+      cells: Object.fromEntries(players.map((p) => {
+        const r = scoreOne(m.predictions[p.key], m.actual);
+        return [p.key, { pred: m.predictions[p.key], points: r.points, category: r.category }];
+      })),
+    }));
+
+    return {
+      players: sorted,            // leaderboard order
+      columnOrder: players,       // grid column order (E..K)
+      matchViews,
+      meta: { maxTotal, playedCount, totalMatches: matches.length, mismatchCount },
+    };
+  }
+
+  /* ===== 4. TEST HARNESS (?test) =================================== */
+  function runTests() {
+    const results = [];
+    const eq = (name, got, want) => {
+      const ok = JSON.stringify(got) === JSON.stringify(want);
+      results.push({ test: name, ok: ok ? '✅' : '❌', got: JSON.stringify(got), want: JSON.stringify(want) });
+    };
+
+    // parseScore
+    eq('parse blank', parseScore(''), null);
+    eq('parse spaces', parseScore('   '), null);
+    eq('parse null', parseScore(null), null);
+    eq('parse 1-0', parseScore('1-0'), { home: 1, away: 0 });
+    eq('parse "1 - 0"', parseScore('1 - 0'), { home: 1, away: 0 });
+    eq('parse " 2-1 "', parseScore(' 2-1 '), { home: 2, away: 1 });
+    eq('parse 2:1', parseScore('2:1'), { home: 2, away: 1 });
+    eq('parse en-dash', parseScore('2–1'), { home: 2, away: 1 });
+    eq('parse em-dash', parseScore('2—1'), { home: 2, away: 1 });
+    eq('parse 10-12', parseScore('10-12'), { home: 10, away: 12 });
+    eq('parse fullwidth', parseScore('２-１'), { home: 2, away: 1 });
+    eq('parse (2-1)', parseScore('(2-1)'), { home: 2, away: 1 });
+    eq('parse "-"', parseScore('-'), null);
+    eq('parse 2-', parseScore('2-'), null);
+    eq('parse 2', parseScore('2'), null);
+    eq('parse 2-1-0', parseScore('2-1-0'), null);
+    eq('parse 999-0', parseScore('999-0'), null);
+
+    // scoreOne
+    eq('exact', scoreOne('2-1', '2-1'), { points: 3, category: 'exact' });
+    eq('exact draw=3', scoreOne('1-1', '1-1'), { points: 3, category: 'exact' });
+    eq('draw=2', scoreOne('1-1', '0-0'), { points: 2, category: 'draw' });
+    eq('outcome home', scoreOne('2-1', '1-0'), { points: 1, category: 'outcome' });
+    eq('outcome away', scoreOne('0-2', '1-3'), { points: 1, category: 'outcome' });
+    eq('miss wrong side', scoreOne('2-1', '0-2'), { points: 0, category: 'miss' });
+    eq('miss drew-but-win', scoreOne('1-1', '2-1'), { points: 0, category: 'miss' });
+    eq('miss won-but-draw', scoreOne('2-1', '1-1'), { points: 0, category: 'miss' });
+    eq('blank pred=miss', scoreOne('', '2-1'), { points: 0, category: 'miss' });
+    eq('blank actual=pending', scoreOne('2-1', ''), { points: 0, category: 'pending' });
+    eq('junk pred=miss', scoreOne('junk', '2-1'), { points: 0, category: 'miss' });
+    eq('junk actual=pending', scoreOne('2-1', 'junk'), { points: 0, category: 'pending' });
+
+    // aggregatePlayer
+    const fx = [
+      { row: 2, predictions: { p: '2-1' }, actual: '2-1' }, // exact 3
+      { row: 3, predictions: { p: '1-1' }, actual: '0-0' }, // draw 2
+      { row: 4, predictions: { p: '2-1' }, actual: '1-0' }, // outcome 1
+      { row: 5, predictions: { p: '2-0' }, actual: '0-2' }, // miss 0
+    ];
+    const agg = aggregatePlayer({ key: 'p', name: 'P', index: 0, sheetTotal: 6 }, fx);
+    eq('agg total', agg.total, 6);
+    eq('agg counts', agg.counts, { exact: 1, draw: 1, outcome: 1, miss: 1, pending: 0 });
+    eq('agg mismatch false', agg.sheetMismatch, false);
+    const agg2 = aggregatePlayer({ key: 'p', name: 'P', index: 0, sheetTotal: 7 }, fx);
+    eq('agg mismatch true', agg2.sheetMismatch, true);
+    const aggPend = aggregatePlayer({ key: 'p', name: 'P', index: 0, sheetTotal: null },
+      fx.concat([{ row: 6, predictions: { p: '1-0' }, actual: null }]));
+    eq('agg pending counted', aggPend.counts.pending, 1);
+    eq('agg pending total unchanged', aggPend.total, 6);
+
+    // computeStandings
+    const mk = (key, name) => ({ key, name });
+    const csPayload = {
+      players: [mk('a', 'A'), mk('b', 'B'), mk('c', 'C')],
+      sheetTotals: {},
+      matches: [
+        { row: 2, predictions: { a: '2-1', b: '2-1', c: '0-0' }, actual: '2-1', played: true }, // a:3 b:3 c:0 (pred draw, actual home win)
+        { row: 3, predictions: { a: '1-1', b: '3-0', c: '1-0' }, actual: '1-1', played: true }, // a:3 b:0 c:0 (pred home win, actual draw)
+      ],
+    };
+    const cs = computeStandings(csPayload);
+    eq('standings ranks', cs.players.map((p) => [p.key, p.total, p.rank]),
+      [['a', 6, 1], ['b', 3, 2], ['c', 0, 3]]);
+    // determinism
+    const cs2 = computeStandings(csPayload);
+    eq('standings deterministic', JSON.stringify(cs.players.map((p) => p.key)),
+      JSON.stringify(cs2.players.map((p) => p.key)));
+    // shared rank: two equal on all four keys -> 1,1,3
+    const tiePayload = {
+      players: [mk('a', 'A'), mk('b', 'B'), mk('c', 'C')], sheetTotals: {},
+      matches: [{ row: 2, predictions: { a: '2-1', b: '2-1', c: '0-0' }, actual: '2-1', played: true }],
+    };
+    eq('shared rank', computeStandings(tiePayload).players.map((p) => p.rank), [1, 1, 3]);
+    // all-pending: totals 0, ranks all 1, playedCount 0
+    const pendPayload = {
+      players: [mk('a', 'A'), mk('b', 'B')], sheetTotals: {},
+      matches: [{ row: 2, predictions: { a: '1-0', b: '2-0' }, actual: null, played: false }],
+    };
+    const pcs = computeStandings(pendPayload);
+    eq('all-pending ranks', pcs.players.map((p) => p.rank), [1, 1]);
+    eq('all-pending maxTotal', pcs.meta.maxTotal, 0);
+    eq('all-pending playedCount', pcs.meta.playedCount, 0);
+
+    const passed = results.filter((r) => r.ok === '✅').length;
+    console.log('%cWC2026 tests: ' + passed + '/' + results.length + ' passed',
+      'font-weight:bold;color:' + (passed === results.length ? '#22C55E' : '#EF4444'));
+    console.table(results);
+    return { passed, total: results.length, results };
+  }
+
+  /* ===== 2. DATA LAYER (fetch · poll · backoff · cache · store) ===== */
+  const store = (() => {
+    let state = { status: 'loading', data: null, source: null, fetchedAt: 0, error: null, fails: 0 };
+    const subs = new Set();
+    return {
+      get: () => state,
+      set: (patch) => { state = { ...state, ...patch }; subs.forEach((f) => f(state)); },
+      subscribe: (f) => { subs.add(f); return () => subs.delete(f); },
+    };
+  })();
+
+  function validateShape(p) {
+    return !!p && p.ok === true
+      && Array.isArray(p.matches)
+      && Array.isArray(p.players) && p.players.length === 7
+      && p.meta && typeof p.meta.matchCount === 'number';
+  }
+
+  function saveCache(payload) {
+    try { localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ payload, savedAt: Date.now() })); }
+    catch (_) { /* Safari private mode etc. — non-fatal */ }
+  }
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem(CONFIG.CACHE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj || !validateShape(obj.payload)) return null;
+      return obj;
+    } catch (_) { return null; }
+  }
+
+  async function fetchData() {
+    if (CONFIG.DEMO) { await delay(280); return buildDemoPayload(); }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), CONFIG.REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(CONFIG.WEB_APP_URL + '?t=' + Date.now(), { signal: ctrl.signal });
+      const payload = await res.json();
+      if (!validateShape(payload)) {
+        throw new Error((payload && payload.error) || 'Անվավեր պատասխան սերվերից');
+      }
+      return payload;
+    } finally { clearTimeout(timer); }
+  }
+
+  let pollTimer = null;
+  let inFlight = false;
+
+  async function tick() {
+    if (inFlight) return;
+    inFlight = true;
+    const hadData = !!store.get().data;
+    store.set({ status: hadData ? 'refreshing' : 'loading' });
+    try {
+      const payload = await fetchData();
+      saveCache(payload);
+      store.set({
+        status: 'ok', data: payload, source: CONFIG.DEMO ? 'demo' : 'network',
+        fetchedAt: Date.now(), error: null, fails: 0,
+      });
+    } catch (err) {
+      const fails = store.get().fails + 1;
+      store.set({ status: 'error', error: String((err && err.message) || err), fails });
+      if (store.get().data) toast('Թարմացման սխալ — ցուցադրվում են վերջին տվյալները');
+    } finally {
+      inFlight = false;
+      schedulePoll();
+    }
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (document.hidden) return; // resumes on visibilitychange
+    const s = store.get();
+    let ms = CONFIG.POLL_MS;
+    if (s.status === 'error') {
+      ms = Math.min(CONFIG.POLL_MS * Math.pow(2, Math.max(0, s.fails - 1)), CONFIG.BACKOFF_MAX_MS);
+    }
+    ms = Math.round(ms * (0.85 + Math.random() * 0.3)); // ±15% jitter
+    pollTimer = setTimeout(tick, ms);
+  }
+
+  function refreshNow() { clearTimeout(pollTimer); tick(); }
+  const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ===== 5. STATE → VIEW MODEL ===================================== */
+  const view = { filter: 'all', highlight: null }; // pure view-state (no refetch)
+
+  function buildViewModel(payload) {
+    const standings = computeStandings(payload);
+    return {
+      players: standings.players,
+      columnOrder: standings.columnOrder,
+      matchViews: standings.matchViews,
+      meta: standings.meta,
+    };
+  }
+
+  /* ===== 6. UI HELPERS ============================================= */
+  const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (sel) => document.querySelector(sel);
+  const refs = {};
+
+  const ICON = { exact: '◆', draw: '≈', outcome: '▲', miss: '✕', pending: '⏱' };
+  const LABEL_HY = { exact: 'Ճշգրիտ', draw: 'Ոչ‑ոքի', outcome: 'Ելք', miss: 'Բաց', pending: 'Առաջիկա' };
+  const PBADGE = { exact: '+3', draw: '+2', outcome: '+1', miss: '0', pending: '' };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  const classFor = (category) => 'cell--' + category;
+
+  function el(tag, props, children) {
+    const node = document.createElement(tag);
+    if (props) for (const k in props) {
+      if (k === 'class') node.className = props[k];
+      else if (k === 'dataset') Object.assign(node.dataset, props[k]);
+      else if (k in node) node[k] = props[k];
+      else node.setAttribute(k, props[k]);
+    }
+    if (children != null) (Array.isArray(children) ? children : [children]).forEach((c) =>
+      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+    return node;
+  }
+
+  function countUp(node, to) {
+    const from = Number(node.dataset.val || 0);
+    node.dataset.val = String(to);
+    if (REDUCE || from === to) { node.textContent = String(to); return; }
+    const start = performance.now(), dur = 600;
+    function step(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      node.textContent = String(Math.round(from + (to - from) * eased));
+      if (t < 1) requestAnimationFrame(step); else node.textContent = String(to);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function fmtClock(ms) {
+    try {
+      return new Intl.DateTimeFormat(CONFIG.LOCALE, { timeZone: CONFIG.TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+    } catch (_) { return new Date(ms).toLocaleTimeString(); }
+  }
+  function fmtRel(ms) {
+    const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    if (s < 5) return 'հենց հիմա';
+    if (s < 60) return s + ' վրկ առաջ';
+    const m = Math.round(s / 60);
+    if (m < 60) return m + ' րոպե առաջ';
+    return Math.round(m / 60) + ' ժ առաջ';
+  }
+
+  function toast(msg) {
+    const t = el('div', { class: 'toast' }, '⚠️ ' + msg);
+    refs.toasts.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; setTimeout(() => t.remove(), 400); }, 4200);
+  }
+
+  /* ===== 7. RENDER: HEADER ======================================== */
+  function renderHeader(state) {
+    const dot = refs.statusDot, lbl = refs.statusLabel;
+    const stale = state.fetchedAt && (Date.now() - state.fetchedAt > CONFIG.STALE_AFTER_MS);
+    let cls = 'dot dot--off', text = 'Անջատ';
+    if (state.status === 'loading' || state.status === 'refreshing') { cls = 'dot dot--busy'; text = 'Թարմացում…'; }
+    else if (state.status === 'ok' && !stale) { cls = 'dot dot--live'; text = CONFIG.DEMO ? 'ԴԵՄՈ' : 'ՈՒՂԻՂ'; }
+    else if (stale || state.status === 'error') { cls = 'dot dot--off'; text = state.status === 'error' ? 'Անջատ' : 'Հնացած'; }
+    dot.className = cls; lbl.textContent = text;
+    refs.refreshIcon.style.animation = (state.status === 'refreshing' && !REDUCE) ? 'pulse 1s linear infinite' : 'none';
+
+    if (state.fetchedAt) {
+      refs.updatedRel.textContent = 'Թարմացվել է ' + fmtRel(state.fetchedAt);
+      refs.updatedAbs.textContent = fmtClock(state.fetchedAt) + (CONFIG.DEMO ? ' · դեմո' : '');
+    }
+  }
+
+  /* ===== 8. RENDER: LEADERBOARD (keyed nodes + FLIP + count-up) ==== */
+  function buildRankRow(s) {
+    const li = el('li', { class: 'rank-row glass rounded-xl px-3 py-3 flex items-center gap-3', dataset: { playerId: s.key } });
+    li.innerHTML =
+      '<div class="rank-badge w-9 text-center"><span class="medal text-lg">' + s.rank + '</span></div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<div class="flex items-center gap-2 mb-1.5">' +
+          '<span class="rank-name font-bold truncate"></span>' +
+          '<span class="chip chip-mismatch mismatch hidden tip" data-tip="">!</span>' +
+        '</div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>' +
+      '</div>' +
+      '<div class="rank-chips hidden sm:flex items-center gap-1.5">' +
+        '<span class="chip chip-exact tip" data-tip="Ճշգրիտ կանխատեսումներ">◆ <span class="c-exact num">0</span></span>' +
+        '<span class="chip chip-draw tip" data-tip="Ճիշտ ոչ‑ոքիներ">≈ <span class="c-draw num">0</span></span>' +
+        '<span class="chip chip-outcome tip" data-tip="Ճիշտ ելքեր">▲ <span class="c-outcome num">0</span></span>' +
+      '</div>' +
+      '<div class="text-right w-16">' +
+        '<div class="total-num text-2xl font-extrabold num" data-val="0">0</div>' +
+        '<div class="text-[10px]" style="color:var(--text-lo)">միավոր</div>' +
+      '</div>';
+    return li;
+  }
+
+  function patchRankRow(li, s, maxTotal) {
+    li.dataset.rank = String(s.rank);
+    li.querySelector('.medal').textContent = s.rank <= 3 ? ['🥇', '🥈', '🥉'][s.rank - 1] : s.rank;
+    li.querySelector('.rank-name').textContent = s.name;
+    li.querySelector('.bar-fill').style.width = (maxTotal ? (s.total / maxTotal) * 100 : 0) + '%';
+    li.querySelector('.c-exact').textContent = s.counts.exact;
+    li.querySelector('.c-draw').textContent = s.counts.draw;
+    li.querySelector('.c-outcome').textContent = s.counts.outcome;
+    countUp(li.querySelector('.total-num'), s.total);
+    const mm = li.querySelector('.mismatch');
+    if (s.sheetMismatch) {
+      mm.classList.remove('hidden');
+      mm.dataset.tip = 'Հաշված՝ ' + s.total + ' · Աղյուսակում՝ ' + s.sheetTotal;
+    } else { mm.classList.add('hidden'); }
+  }
+
+  function renderLeaderboard(players, maxTotal) {
+    const ol = refs.leaderboard;
+    const firstTops = new Map();
+    Array.from(ol.children).forEach((li) => firstTops.set(li.dataset.playerId, li.getBoundingClientRect().top));
+    const byId = new Map(Array.from(ol.children).map((li) => [li.dataset.playerId, li]));
+
+    players.forEach((s) => {
+      let li = byId.get(s.key);
+      if (!li) li = buildRankRow(s);
+      patchRankRow(li, s, maxTotal);
+      ol.appendChild(li); // reorder into standings order
+    });
+
+    if (!REDUCE) {
+      Array.from(ol.children).forEach((li) => {
+        const first = firstTops.get(li.dataset.playerId);
+        if (first == null) return;
+        const last = li.getBoundingClientRect().top;
+        const dy = first - last;
+        if (dy) {
+          li.style.transition = 'none';
+          li.style.transform = 'translateY(' + dy + 'px)';
+          requestAnimationFrame(() => {
+            li.style.transition = 'transform .55s cubic-bezier(.22,1,.36,1)';
+            li.style.transform = '';
+          });
+        }
+      });
+    }
+  }
+
+  /* ===== Stats strip ============================================== */
+  function renderStats(vm) {
+    const leader = vm.players[0];
+    const mostExact = vm.players.slice().sort((a, b) => b.counts.exact - a.counts.exact)[0];
+    const cards = [
+      { label: 'Խաղացված', value: vm.meta.playedCount + ' / ' + vm.meta.totalMatches, icon: '⚽' },
+      { label: 'Մնացել է', value: String(vm.meta.totalMatches - vm.meta.playedCount), icon: '⏳' },
+      { label: 'Առաջատար', value: leader ? leader.name : '—', sub: leader ? leader.total + ' միավոր' : '', icon: '👑' },
+      { label: 'Ամ. շատ ճշգրիտ', value: mostExact ? mostExact.name : '—', sub: mostExact ? mostExact.counts.exact + ' ◆' : '', icon: '🎯' },
+    ];
+    refs.stats.innerHTML = cards.map((c) =>
+      '<div class="glass rounded-xl p-3">' +
+        '<div class="text-xs mb-1" style="color:var(--text-lo)">' + c.icon + ' ' + esc(c.label) + '</div>' +
+        '<div class="font-bold truncate">' + esc(c.value) + '</div>' +
+        (c.sub ? '<div class="text-xs" style="color:var(--text-mid)">' + esc(c.sub) + '</div>' : '') +
+      '</div>'
+    ).join('');
+  }
+
+  /* ===== Mismatch banner ========================================= */
+  function renderMismatchBanner(vm) {
+    const b = refs.mismatchBanner;
+    if (vm.meta.mismatchCount >= 3) {
+      b.classList.remove('hidden');
+      b.textContent = '⚠ ' + vm.meta.mismatchCount + ' խաղացողի հաշիվն Աղյուսակ‑26‑ից տարբերվում է հաշվարկվածից։ Ցուցադրվում է հաշվարկված միավորը (ստուգեք Excel‑ի բանաձևը)։';
+    } else { b.classList.add('hidden'); }
+  }
+
+  /* ===== 9. RENDER: GRID (desktop matrix + mobile cards) ========== */
+  function actualChip(m) {
+    if (m.played) return '<span class="result-chip">✓ ' + esc(m.actual) + '</span>';
+    return '<span class="result-chip result-chip--pending">⏱ ' + esc(m.datetime || 'Առաջիկա') + '</span>';
+  }
+  function fixtureLabel(m) {
+    const title = (m.teams && m.teams.home && m.teams.away)
+      ? esc(m.teams.home) + ' <span style="color:var(--text-lo)">vs</span> ' + esc(m.teams.away)
+      : esc(m.matchup || 'Խաղ ' + m.row);
+    return title;
+  }
+  function cellInner(cell, m) {
+    const showPred = !(CONFIG.HIDE_UPCOMING_PREDICTIONS && !m.played);
+    const predTxt = cell.pred ? esc(cell.pred) : '—';
+    const badge = PBADGE[cell.category] ? '<span class="pbadge">' + PBADGE[cell.category] + '</span>' : '';
+    return '<div class="pred">' + (showPred ? predTxt : '•') + '</div>' + badge;
+  }
+  function cellTip(p, cell, m) {
+    const res = m.played ? m.actual : 'դեռ չկա';
+    return p.name + ' · Կանխատեսում ' + (cell.pred || '—') + ' · Արդյունք ' + res + ' · ' + LABEL_HY[cell.category] + (PBADGE[cell.category] ? ' → ' + cell.points : '');
+  }
+
+  function filteredMatches(vm) {
+    if (view.filter === 'upcoming') return vm.matchViews.filter((m) => !m.played);
+    if (view.filter === 'played') return vm.matchViews.filter((m) => m.played);
+    return vm.matchViews;
+  }
+
+  function renderGridDesktop(vm) {
+    const cols = vm.columnOrder;
+    const dimCol = (k) => view.highlight && view.highlight !== k ? ' is-dim' : '';
+    const head = '<tr><th class="corner">Խաղ / Կանխատեսում</th>' +
+      cols.map((p) => '<th class="' + (dimCol(p.key) ? 'is-dim' : '') + '">' + esc(p.name) + '</th>').join('') + '</tr>';
+    const body = filteredMatches(vm).map((m) =>
+      '<tr>' +
+        '<td class="fixture">' +
+          '<div class="flex items-center gap-2 mb-1"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
+            '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
+          '<div class="flex items-center gap-2 text-xs" style="color:var(--text-lo)">' +
+            (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m) + '</div>' +
+        '</td>' +
+        cols.map((p) => {
+          const cell = m.cells[p.key];
+          return '<td><div class="cell ' + classFor(cell.category) + dimCol(p.key) + ' tip" tabindex="0" ' +
+            'data-tip="' + esc(cellTip(p, cell, m)) + '" aria-label="' + esc(cellTip(p, cell, m)) + '">' +
+            cellInner(cell, m) + '</div></td>';
+        }).join('') +
+      '</tr>'
+    ).join('');
+    refs.gridDesktop.innerHTML = '<table class="w-full"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function renderGridMobile(vm) {
+    const cols = vm.columnOrder;
+    refs.gridMobile.innerHTML = filteredMatches(vm).map((m) =>
+      '<div class="glass rounded-xl p-3' + (m.played ? '' : ' opacity-90') + '">' +
+        '<div class="flex items-center justify-between gap-2 mb-2">' +
+          '<div class="flex items-center gap-2 min-w-0"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
+            '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
+          actualChip(m) +
+        '</div>' +
+        '<div class="grid grid-cols-2 gap-2">' +
+          cols.map((p) => {
+            const cell = m.cells[p.key];
+            const dim = view.highlight && view.highlight !== p.key ? ' is-dim' : '';
+            return '<div class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ' + classFor(cell.category) + dim + '">' +
+              '<span class="text-xs font-medium truncate" style="opacity:.9">' + esc(p.name) + '</span>' +
+              '<span class="text-sm font-bold whitespace-nowrap">' + (cell.pred ? esc(cell.pred) : '—') +
+                (PBADGE[cell.category] ? ' <span class="text-[10px] opacity-80">' + PBADGE[cell.category] + '</span>' : '') + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>'
+    ).join('');
+  }
+
+  function renderToolbar(vm) {
+    // segmented filter
+    const seg = [['all', 'Բոլորը'], ['upcoming', 'Առաջիկա'], ['played', 'Խաղացված']];
+    refs.toolbar.innerHTML = '<div class="inline-flex glass rounded-full p-1 text-sm">' +
+      seg.map(([k, label]) =>
+        '<button class="seg-btn rounded-full px-3 py-1 font-medium" data-filter="' + k + '" aria-pressed="' + (view.filter === k) + '">' + label + '</button>'
+      ).join('') + '</div>';
+    refs.toolbar.querySelectorAll('[data-filter]').forEach((btn) =>
+      btn.addEventListener('click', () => { view.filter = btn.dataset.filter; rerenderView(); }));
+
+    // highlight chips (per player)
+    refs.hlChips.innerHTML = '<span class="text-xs mr-1" style="color:var(--text-lo)">Ընդգծել՝</span>' +
+      vm.columnOrder.map((p) =>
+        '<button class="hl-chip chip" data-hl="' + p.key + '" aria-pressed="' + (view.highlight === p.key) + '">' + esc(p.name) + '</button>'
+      ).join('');
+    refs.hlChips.querySelectorAll('[data-hl]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        view.highlight = (view.highlight === btn.dataset.hl) ? null : btn.dataset.hl;
+        rerenderView();
+      }));
+  }
+
+  /* ===== Main render orchestrator ================================= */
+  let lastVM = null;
+  function render(state) {
+    renderHeader(state);
+
+    const configMissing = !CONFIG.DEMO && /PASTE_WEB_APP|XXXX/.test(CONFIG.WEB_APP_URL);
+    if (configMissing && !state.data) {
+      refs.skeleton.classList.add('hidden');
+      refs.content.classList.add('hidden');
+      refs.configNeeded.classList.remove('hidden');
+      return;
+    }
+    if (!state.data) {
+      // cold start, still loading / error with no cache
+      if (state.status === 'error') { refs.skeleton.classList.add('hidden'); toastOnce(state.error); }
+      return;
+    }
+
+    const vm = buildViewModel(state.data);
+    lastVM = vm;
+    refs.skeleton.classList.add('hidden');
+    refs.configNeeded.classList.add('hidden');
+    refs.content.classList.remove('hidden');
+
+    renderLeaderboard(vm.players, vm.meta.maxTotal);
+    renderStats(vm);
+    renderMismatchBanner(vm);
+    renderToolbar(vm);
+    rerenderView();
+  }
+
+  function rerenderView() {
+    if (!lastVM) return;
+    renderGridDesktop(lastVM);
+    renderGridMobile(lastVM);
+    // sync toolbar pressed-states without rebuilding listeners
+    refs.toolbar.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(view.filter === b.dataset.filter)));
+    refs.hlChips.querySelectorAll('[data-hl]').forEach((b) => b.setAttribute('aria-pressed', String(view.highlight === b.dataset.hl)));
+  }
+
+  let _toasted = '';
+  function toastOnce(msg) { if (msg && msg !== _toasted) { _toasted = msg; toast('Միացման սխալ — ' + msg); } }
+
+  /* ===== 10. MAIN (wire refs · listeners · boot · poll) =========== */
+  function cacheRefs() {
+    Object.assign(refs, {
+      statusDot: $('#status-dot'), statusLabel: $('#status-label'),
+      refreshIcon: $('#refresh-icon'), refreshBtn: $('#refresh-btn'),
+      updatedRel: $('#updated-rel'), updatedAbs: $('#updated-abs'),
+      skeleton: $('#skeleton'), content: $('#content'), configNeeded: $('#config-needed'),
+      leaderboard: $('#leaderboard'), stats: $('#stats-strip'),
+      toolbar: $('#grid-toolbar'), hlChips: $('#hl-chips'),
+      gridDesktop: $('#grid-desktop'), gridMobile: $('#grid-mobile'),
+      mismatchBanner: $('#mismatch-banner'), toasts: $('#toast-container'),
+    });
+  }
+
+  function boot() {
+    cacheRefs();
+
+    if (CONFIG.TEST) runTests();
+
+    store.subscribe(render);
+    refs.refreshBtn.addEventListener('click', refreshNow);
+
+    // instant first paint from last-good cache (if any), then fetch live
+    const cached = loadCache();
+    if (cached && !CONFIG.DEMO) {
+      const fresh = Date.now() - cached.savedAt <= CONFIG.STALE_AFTER_MS;
+      store.set({ status: fresh ? 'ok' : 'error', data: cached.payload, source: 'cache', fetchedAt: cached.savedAt });
+    } else {
+      render(store.get());
+    }
+
+    tick(); // first live fetch
+
+    // live wiring
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshNow(); });
+    window.addEventListener('online', refreshNow);
+    setInterval(() => { const s = store.get(); if (s.fetchedAt) renderHeader(s); }, 1000); // tick "x ago"
+  }
+
+  /* ===== DEMO DATA (only used with ?demo) ========================= */
+  let _demoStep = 6; // how many matches have a result so far (advances each poll)
+  function buildDemoPayload() {
+    const fx = buildDemoFixtures();
+    _demoStep = Math.min(fx.length, _demoStep + 1); // reveal one more result each refresh -> live demo
+    const players = PLAYER_KEYS.map((key, i) => ({ key, name: ['Գարիկ','Խաժակ','Սաշա','Արման','Պարթև','Վահե','Արտյոմ'][i] }));
+    const matches = fx.map((m, i) => ({
+      row: 2 + i, weekday: m.weekday, group: m.group, matchup: m.matchup,
+      teams: { home: m.home, away: m.away }, datetime: m.datetime,
+      predictions: m.predictions, actual: i < _demoStep ? m.finalActual : null,
+      played: i < _demoStep,
+    }));
+    // sheetTotals: pretend the sheet roughly agrees, but nudge one player to demo the mismatch chip
+    const sheetTotals = {};
+    const cs = computeStandings({ players, matches, sheetTotals: {} });
+    cs.players.forEach((p) => { sheetTotals[p.key] = p.total; });
+    sheetTotals[players[2].key] += 1; // Սաշա mismatch demo
+    return { ok: true, players, matches, sheetTotals, meta: { generatedAt: new Date().toISOString(), matchCount: matches.length } };
+  }
+
+  function buildDemoFixtures() {
+    const nations = [
+      'Argentina','France','Brazil','England','Spain','Portugal','Netherlands','Germany',
+      'Belgium','Croatia','Uruguay','Colombia','Mexico','USA','Canada','Japan',
+      'South Korea','Australia','Morocco','Senegal','Nigeria','Ghana','Egypt','Cameroon',
+      'Switzerland','Denmark','Poland','Serbia','Wales','Scotland','Sweden','Norway',
+      'Austria','Ukraine','Turkey','Greece','Ecuador','Peru','Chile','Paraguay',
+      'Iran','Saudi Arabia','Qatar','Tunisia','Algeria','Ivory Coast','Costa Rica','Panama',
+    ];
+    const groups = 'ABCDEFGHIJKL'.split('');
+    const weekdays = ['Հինգշաբթի','Ուրբաթ','Շաբաթ','Կիրակի'];
+    const rng = (() => { let s = 20260611 >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+    const r = (n) => Math.floor(rng() * n);
+    const fixtures = [];
+    for (let g = 0; g < 12; g++) {
+      const base = g * 4;
+      const pairs = [[base, base + 1], [base + 2, base + 3]];
+      pairs.forEach(([hi, ai], j) => {
+        const idx = g * 2 + j;
+        const home = nations[hi], away = nations[ai];
+        const finalActual = r(4) + '-' + r(4);
+        const predictions = {};
+        PLAYER_KEYS.forEach((k) => { predictions[k] = r(4) + '-' + r(4); });
+        fixtures.push({
+          group: groups[g], home, away, matchup: home + ' vs ' + away,
+          weekday: weekdays[idx % weekdays.length],
+          datetime: (11 + Math.floor(idx / 4)) + '.06 · ' + (16 + (idx % 4) * 2) + ':00',
+          predictions, finalActual,
+        });
+      });
+    }
+    return fixtures;
+  }
+
+  // go
+  boot();
+  </script>
+</body>
+</html>

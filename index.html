@@ -168,6 +168,13 @@
       background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-hi);
     }
     .result-chip--pending { color: var(--text-lo); }
+    /* live / soon match chips (idea #1 badge + idea #2 ESPN score) */
+    .live-badge {
+      color: #0A0F1E; font-weight: 800; border-color: transparent;
+      background: var(--c-exact);
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.7); animation: pulse 1.8s infinite;
+    }
+    .live-badge--soon { color: #0A0F1E; font-weight: 800; border-color: transparent; background: var(--gold); }
 
     /* ===== Tooltip (CSS, zero-dependency) ===== */
     .tip { position: relative; }
@@ -309,6 +316,14 @@
     TZ: 'Asia/Yerevan',
     LOCALE: 'hy-AM',
     HIDE_UPCOMING_PREDICTIONS: false, // flip to true to hide picks until kickoff
+    // --- live indicators (idea #1 clock badge + idea #2 ESPN scores) ---
+    LIVE_WINDOW_MIN: 115,           // a match counts as "live" for this long after kickoff (90+HT+stoppage)
+    SOON_WINDOW_MIN: 30,            // "starts in Xm" lead-in before kickoff
+    LIVE_RETICK_MS: 20000,          // grid-only re-evaluation cadence for time/live states
+    YEREVAN_UTC_OFFSET_MIN: 240,    // column D is Asia/Yerevan local = UTC+4, no DST
+    LIVE_SCORES: true,              // pull real in-play scores from ESPN (display-only)
+    ESPN_SCOREBOARD: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+    SHOW_LIVE_PILL: true,           // header shows "ՈՒՂԻՂ · N խաղ" when matches are in progress
     DEMO: location.search.includes('demo'),
     TEST: location.search.includes('test'),
   };
@@ -342,6 +357,35 @@
     if (po === 0 && ao === 0) return { points: 2, category: 'draw' };
     if (po === ao && po !== 0) return { points: 1, category: 'outcome' };
     return { points: 0, category: 'miss' };
+  }
+
+  // --- clock helpers for the LIVE badge (pure; live here so the ?test harness reaches them) ---
+  // keyed by the first 3 letters, so both "June" and "Jun" resolve
+  const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+
+  // "June 11, 2026 at 23:00" (English month, Asia/Yerevan local) -> epoch ms (UTC) | null.
+  // Builds the instant with Date.UTC minus the Yerevan offset — NEVER Date.parse/new Date(y,m,…)
+  // (both would use the VIEWER's timezone, which is wrong for non-Armenian viewers).
+  function parseKickoff(str) {
+    if (str == null) return null;
+    const m = String(str).trim().match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4}).*?(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const mon = MONTHS[m[1].toLowerCase().slice(0, 3)];
+    if (mon == null) return null;
+    const day = +m[2], year = +m[3], hh = +m[4], mm = +m[5];
+    if (day < 1 || day > 31 || hh > 23 || mm > 59) return null;
+    return Date.UTC(year, mon, day, hh, mm) - CONFIG.YEREVAN_UTC_OFFSET_MIN * 60000;
+  }
+
+  // -> 'finished' | 'live' | 'soon' | 'upcoming'. A result in column L (played) always wins.
+  function matchTimeState(kickoffMs, nowMs, played) {
+    if (played) return 'finished';
+    if (kickoffMs == null) return 'upcoming';
+    const endMs = kickoffMs + CONFIG.LIVE_WINDOW_MIN * 60000;
+    if (nowMs >= kickoffMs && nowMs <= endMs) return 'live';
+    if (nowMs < kickoffMs && nowMs >= kickoffMs - CONFIG.SOON_WINDOW_MIN * 60000) return 'soon';
+    if (nowMs > endMs) return 'finished';
+    return 'upcoming';
   }
 
   function aggregatePlayer(player, matches) {
@@ -502,6 +546,26 @@
     eq('all-pending maxTotal', pcs.meta.maxTotal, 0);
     eq('all-pending playedCount', pcs.meta.playedCount, 0);
 
+    // parseKickoff — "June 11, 2026 at 23:00" (Yerevan, UTC+4) === 2026-06-11T19:00:00Z
+    const K = Date.UTC(2026, 5, 11, 19, 0); // canonical expected instant
+    eq('kickoff canonical', parseKickoff('June 11, 2026 at 23:00'), K);
+    eq('kickoff midnight->prev UTC day', parseKickoff('June 14, 2026 at 02:00'), Date.UTC(2026, 5, 13, 22, 0));
+    eq('kickoff 3-letter month', parseKickoff('Jun 11, 2026 at 23:00'), K);
+    eq('kickoff blank', parseKickoff(''), null);
+    eq('kickoff null', parseKickoff(null), null);
+    eq('kickoff garbled', parseKickoff('sometime tomorrow'), null);
+    eq('kickoff bad month', parseKickoff('Smarch 3, 2026 at 10:00'), null);
+
+    // matchTimeState — kickoff at t0; window = LIVE_WINDOW_MIN
+    const t0 = K, MIN = 60000;
+    eq('state played->finished', matchTimeState(t0, t0 + 10 * MIN, true), 'finished');
+    eq('state at kickoff->live', matchTimeState(t0, t0, false), 'live');
+    eq('state mid->live', matchTimeState(t0, t0 + 60 * MIN, false), 'live');
+    eq('state just-after-window->finished', matchTimeState(t0, t0 + 116 * MIN, false), 'finished');
+    eq('state 20m-before->soon', matchTimeState(t0, t0 - 20 * MIN, false), 'soon');
+    eq('state 90m-before->upcoming', matchTimeState(t0, t0 - 90 * MIN, false), 'upcoming');
+    eq('state null-kickoff->upcoming', matchTimeState(null, t0, false), 'upcoming');
+
     const passed = results.filter((r) => r.ok === '✅').length;
     console.log('%cWC2026 tests: ' + passed + '/' + results.length + ' passed',
       'font-weight:bold;color:' + (passed === results.length ? '#22C55E' : '#EF4444'));
@@ -553,6 +617,72 @@
       }
       return payload;
     } finally { clearTimeout(timer); }
+  }
+
+  /* ===== LIVE SCORES (ESPN, keyless + CORS-* — display-only) ========
+     Pulled straight from the browser; manual column L stays scoring truth.
+     Any failure is an invisible no-op: liveByKey just stays/empties and the
+     grid falls back to the clock badge. Never feeds scoreOne/computeStandings. */
+  const liveByKey = new Map(); // "<yyyymmdd>|<pairKey>" -> { score, state, minute }
+  let liveInFlight = false;
+
+  // alias table for the few names that differ between the sheet and ESPN
+  const TEAM_ALIASES = {
+    'korea republic': 'south korea', 'republic of korea': 'south korea', 'korea dpr': 'north korea',
+    'usa': 'united states', 'us': 'united states', 'türkiye': 'turkey', 'turkiye': 'turkey',
+    'côte divoire': 'ivory coast', 'cote divoire': 'ivory coast', 'ivory coast': 'ivory coast',
+    'czech republic': 'czechia', 'bosnia herzegovina': 'bosnia and herzegovina',
+    'china pr': 'china', 'ir iran': 'iran', 'curacao': 'curacao',
+  };
+  function normTeam(name) {
+    let s = String(name || '').toLowerCase().trim()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')   // strip diacritics (Türkiye -> turkiye)
+      .replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
+    return TEAM_ALIASES[s] || s;
+  }
+  const pairKey = (a, b) => [normTeam(a), normTeam(b)].sort().join('~');
+  // Yerevan calendar day (YYYYMMDD) for an epoch ms.
+  function yerevanDay(ms) {
+    const d = new Date(ms + CONFIG.YEREVAN_UTC_OFFSET_MIN * 60000);
+    return '' + d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0') + String(d.getUTCDate()).padStart(2, '0');
+  }
+
+  // Fetch ESPN's scoreboard for the given Yerevan day strings and fold into liveByKey.
+  async function refreshLiveScores(dayStrs) {
+    if (!CONFIG.LIVE_SCORES || liveInFlight) return;
+    liveInFlight = true;
+    try {
+      for (const day of dayStrs) {
+        let json;
+        try {
+          const res = await fetch(CONFIG.ESPN_SCOREBOARD + '?dates=' + day, { mode: 'cors' });
+          json = await res.json();
+        } catch (_) { continue; } // network/parse error on one day -> skip, keep prior data
+        for (const ev of (json && json.events) || []) {
+          try {
+            const comp = (ev.competitions && ev.competitions[0]) || {};
+            const cs = comp.competitors || [];
+            if (cs.length !== 2) continue;
+            const a = cs[0], b = cs[1];
+            const an = a.team && (a.team.displayName || a.team.name);
+            const bn = b.team && (b.team.displayName || b.team.name);
+            if (!an || !bn) continue;
+            const st = (ev.status && ev.status.type) || {};
+            const state = st.state || 'pre';                 // pre | in | post
+            const evDay = yerevanDay(Date.parse(ev.date));    // ev.date is UTC ...Z
+            const home = a.homeAway === 'home' ? a : (b.homeAway === 'home' ? b : a);
+            const away = home === a ? b : a;
+            const hs = home.score, as = away.score;
+            const hasScore = hs != null && hs !== '' && as != null && as !== '';
+            liveByKey.set(evDay + '|' + pairKey(an, bn), {
+              score: hasScore ? (hs + '-' + as) : null,
+              state: state,
+              minute: (st.detail || st.shortDetail || '').replace(/\s+/g, ' ').trim(),
+            });
+          } catch (_) { /* one bad event -> skip */ }
+        }
+      }
+    } finally { liveInFlight = false; }
   }
 
   let pollTimer = null;
@@ -678,6 +808,11 @@
     if (state.status === 'loading' || state.status === 'refreshing') { cls = 'dot dot--busy'; text = 'Թարմացում…'; }
     else if (state.status === 'ok' && !stale) { cls = 'dot dot--live'; text = CONFIG.DEMO ? 'ԴԵՄՈ' : 'ՈՒՂԻՂ'; }
     else if (stale || state.status === 'error') { cls = 'dot dot--off'; text = state.status === 'error' ? 'Անջատ' : 'Հնացած'; }
+    // upgrade the pill to show how many matches are in progress right now
+    if (CONFIG.SHOW_LIVE_PILL && lastVM && (state.status === 'ok' || state.status === 'refreshing') && !stale) {
+      const n = liveCount(lastVM.matchViews, Date.now());
+      if (n > 0) { cls = 'dot dot--live'; text = 'ՈՒՂԻՂ · ' + n + ' խաղ'; }
+    }
     dot.className = cls; lbl.textContent = text;
     refs.refreshIcon.style.animation = (state.status === 'refreshing' && !REDUCE) ? 'pulse 1s linear infinite' : 'none';
 
@@ -787,9 +922,49 @@
   }
 
   /* ===== 9. RENDER: GRID (desktop matrix + mobile cards) ========== */
-  function actualChip(m) {
+  // Live decoration for one match, computed at RENDER time (not baked into matchViews,
+  // which would force a re-sort/FLIP just to refresh a badge). ESPN corrects the clock guess.
+  function matchLiveInfo(m, now) {
+    const kickoff = parseKickoff(m.datetime);
+    let state = matchTimeState(kickoff, now, m.played);
+    let live = null;
+    if (CONFIG.LIVE_SCORES && !m.played && (state === 'live' || state === 'soon')) {
+      const day = kickoff != null ? yerevanDay(kickoff) : null;
+      const home = m.teams && m.teams.home, away = m.teams && m.teams.away;
+      if (day && home && away) {
+        const hit = liveByKey.get(day + '|' + pairKey(home, away));
+        if (hit) {
+          live = hit;
+          if (hit.state === 'in') state = 'live';
+          else if (hit.state === 'post') state = 'finished';        // ended per ESPN, awaiting column L
+          else if (hit.state === 'pre' && state === 'live') state = 'soon'; // not kicked off yet per ESPN
+        }
+      }
+    }
+    return { state, kickoff, live };
+  }
+
+  // Unified result/live chip. Precedence: final (col L) > ESPN live score > clock live > soon > pending.
+  function actualChip(m, info) {
     if (m.played) return '<span class="result-chip">✓ ' + esc(m.actual) + '</span>';
+    const st = (info && info.state) || matchTimeState(parseKickoff(m.datetime), Date.now(), false);
+    if (st === 'live') {
+      if (info && info.live && info.live.score) {
+        const min = info.live.minute ? ' · ' + esc(info.live.minute) : '';
+        return '<span class="result-chip live-badge">● ' + esc(info.live.score) + min + '</span>';
+      }
+      return '<span class="result-chip live-badge">● ՈՒՂԻՂ</span>';
+    }
+    if (st === 'soon') {
+      const mins = info && info.kickoff != null ? Math.max(0, Math.round((info.kickoff - Date.now()) / 60000)) : null;
+      return '<span class="result-chip live-badge--soon">⏱ ' + (mins != null ? mins + 'ր-ից' : 'Շուտով') + '</span>';
+    }
     return '<span class="result-chip result-chip--pending">⏱ ' + esc(m.datetime || 'Առաջիկա') + '</span>';
+  }
+
+  // How many fixtures are live right now (for the header pill).
+  function liveCount(matchViews, now) {
+    return matchViews.reduce((n, m) => n + (matchLiveInfo(m, now).state === 'live' ? 1 : 0), 0);
   }
   function fixtureLabel(m) {
     const title = (m.teams && m.teams.home && m.teams.away)
@@ -816,6 +991,7 @@
 
   function renderGridDesktop(vm) {
     const cols = vm.columnOrder;
+    const now = Date.now();
     const dimCol = (k) => view.highlight && view.highlight !== k ? ' is-dim' : '';
     const head = '<tr><th class="corner">Խաղ / Կանխատեսում</th>' +
       cols.map((p) => '<th class="' + (dimCol(p.key) ? 'is-dim' : '') + '">' + esc(p.name) + '</th>').join('') + '</tr>';
@@ -825,7 +1001,7 @@
           '<div class="flex items-center gap-2 mb-1"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
             '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
           '<div class="flex items-center gap-2 text-xs" style="color:var(--text-lo)">' +
-            (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m) + '</div>' +
+            (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m, matchLiveInfo(m, now)) + '</div>' +
         '</td>' +
         cols.map((p) => {
           const cell = m.cells[p.key];
@@ -840,12 +1016,13 @@
 
   function renderGridMobile(vm) {
     const cols = vm.columnOrder;
+    const now = Date.now();
     refs.gridMobile.innerHTML = filteredMatches(vm).map((m) =>
       '<div class="glass rounded-xl p-3' + (m.played ? '' : ' opacity-90') + '">' +
         '<div class="flex items-center justify-between gap-2 mb-2">' +
           '<div class="flex items-center gap-2 min-w-0"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
             '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
-          actualChip(m) +
+          actualChip(m, matchLiveInfo(m, now)) +
         '</div>' +
         '<div class="grid grid-cols-2 gap-2">' +
           cols.map((p) => {
@@ -924,6 +1101,26 @@
     refs.hlChips.querySelectorAll('[data-hl]').forEach((b) => b.setAttribute('aria-pressed', String(view.highlight === b.dataset.hl)));
   }
 
+  // Re-evaluate time-based states + pull live scores, on a light cadence, grid-only (no FLIP).
+  async function retickLive() {
+    if (document.hidden || !lastVM) return;
+    const now = Date.now();
+    const liveDays = new Set();
+    let hasTimed = false;
+    for (const m of lastVM.matchViews) {
+      if (m.played) continue;
+      const k = parseKickoff(m.datetime);
+      const st = matchTimeState(k, now, false);
+      if (st === 'live' || st === 'soon') { hasTimed = true; if (k != null) liveDays.add(yerevanDay(k)); }
+    }
+    if (!hasTimed) return; // nothing time-sensitive on screen → skip the re-render
+    if (CONFIG.LIVE_SCORES && liveDays.size) {
+      try { await refreshLiveScores([...liveDays]); } catch (_) { /* invisible no-op */ }
+    }
+    rerenderView();                                   // grid-only, FLIP-safe
+    const s = store.get(); if (s.fetchedAt) renderHeader(s);
+  }
+
   let _toasted = '';
   function toastOnce(msg) { if (msg && msg !== _toasted) { _toasted = msg; toast('Միացման սխալ — ' + msg); } }
 
@@ -961,9 +1158,11 @@
     tick(); // first live fetch
 
     // live wiring
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshNow(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshNow(); retickLive(); } });
     window.addEventListener('online', refreshNow);
-    setInterval(() => { const s = store.get(); if (s.fetchedAt) renderHeader(s); }, 1000); // tick "x ago"
+    setInterval(() => { const s = store.get(); if (s.fetchedAt) renderHeader(s); }, 1000); // tick "x ago" + live pill
+    setInterval(retickLive, CONFIG.LIVE_RETICK_MS);  // live scores + time-state flips (grid-only)
+    setTimeout(retickLive, 1500);                    // prompt first live-score pull after initial paint
   }
 
   /* ===== DEMO DATA (only used with ?demo) ========================= */

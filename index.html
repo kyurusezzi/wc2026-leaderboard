@@ -176,6 +176,27 @@
     }
     .live-badge--soon { color: #0A0F1E; font-weight: 800; border-color: transparent; background: var(--gold); }
 
+    /* stage / round grouping (idea: dynamic tournament) */
+    #grid-desktop tr.stage-row td {
+      background: rgba(34,211,238,0.07); color: var(--accent-2);
+      font-weight: 800; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+      padding: 7px 10px; border-radius: 8px;
+    }
+    .stage-label {
+      margin: 16px 2px 4px; color: var(--accent-2); font-weight: 800;
+      font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .stage-label:first-child { margin-top: 0; }
+    .stage-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9999px;
+      font-size: 10px; font-weight: 700; color: var(--text-mid);
+      background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    }
+    #stage-select { outline: none; cursor: pointer; border: 1px solid var(--border); }
+    #stage-select option { background: var(--surface-solid); color: var(--text-hi); }
+
     /* ===== Tooltip (CSS, zero-dependency) ===== */
     .tip { position: relative; }
     .tip:hover::after, .tip:focus-visible::after {
@@ -440,6 +461,7 @@
     const matchViews = matches.map((m) => ({
       row: m.row, group: m.group, matchup: m.matchup, teams: m.teams,
       datetime: m.datetime, weekday: m.weekday, actual: m.actual, played: m.played,
+      stage: m.stage || '',
       cells: Object.fromEntries(players.map((p) => {
         const r = scoreOne(m.predictions[p.key], m.actual);
         return [p.key, { pred: m.predictions[p.key], points: r.points, category: r.category }];
@@ -726,7 +748,7 @@
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ===== 5. STATE → VIEW MODEL ===================================== */
-  const view = { filter: 'all', highlight: null }; // pure view-state (no refetch)
+  const view = { filter: 'all', highlight: null, stage: null }; // pure view-state (no refetch)
 
   function buildViewModel(payload) {
     const standings = computeStandings(payload);
@@ -983,10 +1005,48 @@
     return p.name + ' · Կանխատեսում ' + (cell.pred || '—') + ' · Արդյունք ' + res + ' · ' + LABEL_HY[cell.category] + (PBADGE[cell.category] ? ' → ' + cell.points : '');
   }
 
-  function filteredMatches(vm) {
-    if (view.filter === 'upcoming') return vm.matchViews.filter((m) => !m.played);
-    if (view.filter === 'played') return vm.matchViews.filter((m) => m.played);
-    return vm.matchViews;
+  function baseFilter(arr) {
+    if (view.filter === 'upcoming') return arr.filter((m) => !m.played);
+    if (view.filter === 'played') return arr.filter((m) => m.played);
+    return arr;
+  }
+  function filteredMatches(vm) { return baseFilter(vm.matchViews); }
+
+  // distinct non-empty stage labels, in first-seen (sheet) order
+  function distinctStages(vm) {
+    const seen = new Set(), out = [];
+    vm.matchViews.forEach((m) => { const s = m.stage || ''; if (s && !seen.has(s)) { seen.add(s); out.push(s); } });
+    return out;
+  }
+
+  // -> [{ stage, matches, header }] honoring all/upcoming/played + the stage selector.
+  // One implicit group when there are 0–1 stages (back-compatible with the matchday-1 sheet).
+  function visibleGroups(vm) {
+    const base = baseFilter(vm.matchViews);
+    const stages = distinctStages(vm);
+    if (view.stage) return [{ stage: view.stage, matches: base.filter((m) => (m.stage || '') === view.stage), header: false }];
+    if (stages.length <= 1) return [{ stage: null, matches: base, header: false }];
+    const groups = stages.map((s) => ({ stage: s, matches: base.filter((m) => (m.stage || '') === s), header: true }));
+    const noStage = base.filter((m) => !(m.stage || ''));
+    if (noStage.length) groups.push({ stage: '—', matches: noStage, header: true });
+    return groups.filter((g) => g.matches.length);
+  }
+
+  function matchRowDesktop(m, now, cols, dimCol) {
+    return '<tr>' +
+      '<td class="fixture">' +
+        '<div class="flex items-center gap-2 mb-1"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
+          '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
+        '<div class="flex items-center gap-2 text-xs" style="color:var(--text-lo)">' +
+          (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m, matchLiveInfo(m, now)) + '</div>' +
+      '</td>' +
+      cols.map((p) => {
+        const cell = m.cells[p.key];
+        return '<td><div class="cell ' + classFor(cell.category) + dimCol(p.key) + ' tip" tabindex="0" ' +
+          'data-tip="' + esc(cellTip(p, cell, m)) + '" aria-label="' + esc(cellTip(p, cell, m)) + '">' +
+          cellInner(cell, m) + '</div></td>';
+      }).join('') +
+    '</tr>';
   }
 
   function renderGridDesktop(vm) {
@@ -995,59 +1055,63 @@
     const dimCol = (k) => view.highlight && view.highlight !== k ? ' is-dim' : '';
     const head = '<tr><th class="corner">Խաղ / Կանխատեսում</th>' +
       cols.map((p) => '<th class="' + (dimCol(p.key) ? 'is-dim' : '') + '">' + esc(p.name) + '</th>').join('') + '</tr>';
-    const body = filteredMatches(vm).map((m) =>
-      '<tr>' +
-        '<td class="fixture">' +
-          '<div class="flex items-center gap-2 mb-1"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
-            '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
-          '<div class="flex items-center gap-2 text-xs" style="color:var(--text-lo)">' +
-            (m.played ? '' : '<span>' + esc(m.weekday || '') + '</span>') + actualChip(m, matchLiveInfo(m, now)) + '</div>' +
-        '</td>' +
-        cols.map((p) => {
-          const cell = m.cells[p.key];
-          return '<td><div class="cell ' + classFor(cell.category) + dimCol(p.key) + ' tip" tabindex="0" ' +
-            'data-tip="' + esc(cellTip(p, cell, m)) + '" aria-label="' + esc(cellTip(p, cell, m)) + '">' +
-            cellInner(cell, m) + '</div></td>';
-        }).join('') +
-      '</tr>'
+    const span = cols.length + 1;
+    const body = visibleGroups(vm).map((g) =>
+      (g.header ? '<tr class="stage-row"><td colspan="' + span + '">' + esc(g.stage) + ' <span class="stage-count">' + g.matches.length + '</span></td></tr>' : '') +
+      g.matches.map((m) => matchRowDesktop(m, now, cols, dimCol)).join('')
     ).join('');
     refs.gridDesktop.innerHTML = '<table class="w-full"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function matchCardMobile(m, now, cols) {
+    return '<div class="glass rounded-xl p-3' + (m.played ? '' : ' opacity-90') + '">' +
+      '<div class="flex items-center justify-between gap-2 mb-2">' +
+        '<div class="flex items-center gap-2 min-w-0"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
+          '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
+        actualChip(m, matchLiveInfo(m, now)) +
+      '</div>' +
+      '<div class="grid grid-cols-2 gap-2">' +
+        cols.map((p) => {
+          const cell = m.cells[p.key];
+          const dim = view.highlight && view.highlight !== p.key ? ' is-dim' : '';
+          return '<div class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ' + classFor(cell.category) + dim + '">' +
+            '<span class="text-xs font-medium truncate" style="opacity:.9">' + esc(p.name) + '</span>' +
+            '<span class="text-sm font-bold whitespace-nowrap">' + (cell.pred ? esc(cell.pred) : '—') +
+              (PBADGE[cell.category] ? ' <span class="text-[10px] opacity-80">' + PBADGE[cell.category] + '</span>' : '') + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>';
   }
 
   function renderGridMobile(vm) {
     const cols = vm.columnOrder;
     const now = Date.now();
-    refs.gridMobile.innerHTML = filteredMatches(vm).map((m) =>
-      '<div class="glass rounded-xl p-3' + (m.played ? '' : ' opacity-90') + '">' +
-        '<div class="flex items-center justify-between gap-2 mb-2">' +
-          '<div class="flex items-center gap-2 min-w-0"><span class="group-badge">' + esc(m.group || '–') + '</span>' +
-            '<span class="font-semibold text-sm truncate">' + fixtureLabel(m) + '</span></div>' +
-          actualChip(m, matchLiveInfo(m, now)) +
-        '</div>' +
-        '<div class="grid grid-cols-2 gap-2">' +
-          cols.map((p) => {
-            const cell = m.cells[p.key];
-            const dim = view.highlight && view.highlight !== p.key ? ' is-dim' : '';
-            return '<div class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ' + classFor(cell.category) + dim + '">' +
-              '<span class="text-xs font-medium truncate" style="opacity:.9">' + esc(p.name) + '</span>' +
-              '<span class="text-sm font-bold whitespace-nowrap">' + (cell.pred ? esc(cell.pred) : '—') +
-                (PBADGE[cell.category] ? ' <span class="text-[10px] opacity-80">' + PBADGE[cell.category] + '</span>' : '') + '</span>' +
-            '</div>';
-          }).join('') +
-        '</div>' +
-      '</div>'
+    refs.gridMobile.innerHTML = visibleGroups(vm).map((g) =>
+      (g.header ? '<div class="stage-label">' + esc(g.stage) + ' <span class="stage-count">' + g.matches.length + '</span></div>' : '') +
+      g.matches.map((m) => matchCardMobile(m, now, cols)).join('')
     ).join('');
   }
 
   function renderToolbar(vm) {
     // segmented filter
     const seg = [['all', 'Բոլորը'], ['upcoming', 'Առաջիկա'], ['played', 'Խաղացված']];
+    const stages = distinctStages(vm);
+    if (view.stage && stages.indexOf(view.stage) === -1) view.stage = null; // stale stage -> reset
+    const stageSel = stages.length > 1
+      ? '<select id="stage-select" class="glass rounded-full px-3 py-1.5 text-sm" style="color:var(--text-hi)" aria-label="Փուլ">' +
+          '<option value="">Բոլոր փուլերը</option>' +
+          stages.map((s) => '<option value="' + esc(s) + '"' + (view.stage === s ? ' selected' : '') + '>' + esc(s) + '</option>').join('') +
+        '</select>'
+      : '';
     refs.toolbar.innerHTML = '<div class="inline-flex glass rounded-full p-1 text-sm">' +
       seg.map(([k, label]) =>
         '<button class="seg-btn rounded-full px-3 py-1 font-medium" data-filter="' + k + '" aria-pressed="' + (view.filter === k) + '">' + label + '</button>'
-      ).join('') + '</div>';
+      ).join('') + '</div>' + stageSel;
     refs.toolbar.querySelectorAll('[data-filter]').forEach((btn) =>
       btn.addEventListener('click', () => { view.filter = btn.dataset.filter; rerenderView(); }));
+    const sel = refs.toolbar.querySelector('#stage-select');
+    if (sel) sel.addEventListener('change', () => { view.stage = sel.value || null; rerenderView(); });
 
     // highlight chips (per player)
     refs.hlChips.innerHTML = '<span class="text-xs mr-1" style="color:var(--text-lo)">Ընդգծել՝</span>' +
@@ -1173,7 +1237,7 @@
     const players = PLAYER_KEYS.map((key, i) => ({ key, name: ['Գարիկ','Խաժակ','Սաշա','Արման','Պարթև','Վահե','Արտյոմ'][i] }));
     const matches = fx.map((m, i) => ({
       row: 2 + i, weekday: m.weekday, group: m.group, matchup: m.matchup,
-      teams: { home: m.home, away: m.away }, datetime: m.datetime,
+      teams: { home: m.home, away: m.away }, datetime: m.datetime, stage: m.stage,
       predictions: m.predictions, actual: i < _demoStep ? m.finalActual : null,
       played: i < _demoStep,
     }));
@@ -1212,6 +1276,7 @@
           group: groups[g], home, away, matchup: home + ' vs ' + away,
           weekday: weekdays[idx % weekdays.length],
           datetime: (11 + Math.floor(idx / 4)) + '.06 · ' + (16 + (idx % 4) * 2) + ':00',
+          stage: idx < 12 ? '1-ին տուր' : '2-րդ տուր',   // demo: two matchdays to show grouping
           predictions, finalActual,
         });
       });

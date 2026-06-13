@@ -35,8 +35,10 @@ var PLAYERS = [
 ];
 
 var FIRST_DATA_ROW = 2;   // first match row
-var LAST_DATA_ROW  = 25;  // last match row (24 matches: rows 2..25)
-var TOTALS_ROW     = 26;  // sheet's live totals row
+var MAX_MATCHES    = 200; // safety cap (2026 WC = 104 matches; leaves headroom)
+// Optional round/stage label per match — column M (0-based index 12), right of L.
+// Blank for every row = one default group (back-compatible with the matchday-1 sheet).
+var STAGE_COL      = 12;  // M
 
 // ===== Web app entry point =============================================
 function doGet(e) {
@@ -46,15 +48,11 @@ function doGet(e) {
     var sheet = getSheetByGid_(ss, SHEET_GID) || ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
     if (!sheet) throw new Error('Tab not found (gid ' + SHEET_GID + ' / name "' + SHEET_NAME + '")');
 
-    // ONE rectangular read for all 24 match rows (A2:L25 = 24 rows x 12 cols).
-    var grid = sheet
-      .getRange(FIRST_DATA_ROW, 1, LAST_DATA_ROW - FIRST_DATA_ROW + 1, 12)
-      .getValues();
-
-    // ONE read for the sheet's own live totals (E26:K26).
-    var totalsRow = sheet
-      .getRange(TOTALS_ROW, 5, 1, 7) // start col E(5), 7 cols => E..K
-      .getValues()[0];
+    // DYNAMIC range: row 2 down to the last row with content (capped), 13 cols A..M.
+    // The sheet can grow (matchday 2/3, knockouts) with NO code change.
+    var lastRow = Math.min(sheet.getLastRow(), FIRST_DATA_ROW + MAX_MATCHES - 1);
+    var rowCount = Math.max(0, lastRow - FIRST_DATA_ROW + 1);
+    var grid = rowCount ? sheet.getRange(FIRST_DATA_ROW, 1, rowCount, 13).getValues() : [];
 
     var matches = grid.map(function (r, i) {
       var predictions = {};
@@ -67,26 +65,22 @@ function doGet(e) {
         matchup:  str_(r[2]),          // C (raw, always present)
         teams:    splitTeams_(r[2]),   // C parsed best-effort
         datetime: str_(r[3]),          // D (free-text Armenian local time)
+        stage:    str_(r[STAGE_COL]),  // M (round/matchday label; blank = single group)
         predictions: predictions,      // E..K, each "x-y" or null
         actual:   actual,              // L, "x-y" or null
         played:   actual !== null
       };
     }).filter(function (m) {
-      // Drop fully-empty trailing rows so a partly-filled sheet renders cleanly.
-      return m.matchup !== '' || m.actual !== null;
-    });
-
-    var sheetTotals = {};
-    PLAYERS.forEach(function (p, idx) {
-      var v = totalsRow[idx];
-      sheetTotals[p.key] = (v === '' || v === null) ? 0 : (Number(v) || 0);
+      // Keep only real match rows: a splittable "Home vs Away" matchup OR an actual
+      // result. This naturally skips a totals/summary row and blanks wherever they sit
+      // (the client computes its own totals, so no sheet totals row is needed).
+      return (m.teams.home && m.teams.away) || m.actual !== null;
     });
 
     return json_({
       ok: true,
       players: PLAYERS.map(function (p) { return { key: p.key, name: p.name }; }),
       matches: matches,
-      sheetTotals: sheetTotals,
       meta: {
         generatedAt: new Date().toISOString(), // server UTC, when the script ran
         matchCount: matches.length

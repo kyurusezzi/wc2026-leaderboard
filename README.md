@@ -21,9 +21,7 @@ Google Sheet ──▶ Apps Script Web App (doGet → JSON) ──▶ index.html
 ```
 
 The API is intentionally "dumb": it ships the raw score strings. **The browser computes all
-points, breakdown counts, and rankings.** Row 26's totals are used only as a cross‑check — if the
-sheet's number disagrees with the computed one, a small `!` appears, but the displayed score is
-always the freshly computed value.
+points, breakdown counts, and rankings** — so the sheet does **not** need a totals row.
 
 **Scoring:** exact score = **3**, correct draw (not exact) = **2**, correct win/loss side
 (not exact) = **1**, otherwise / blank / not‑yet‑played = **0**. An exact draw (e.g. 1‑1 vs 1‑1)
@@ -31,20 +29,30 @@ scores 3, not 2.
 
 ---
 
-## Sheet layout it expects (rows 2–25 = the 24 matches, row 26 = totals)
+## Sheet layout it expects (one match per row, starting at row 2)
 
 | Col | Content |
 |-----|---------|
 | A | weekday | 
 | B | group |
-| C | matchup, e.g. `Mexico vs Canada` |
-| D | date/time (your local Armenian time, free text) |
+| C | matchup, e.g. `Mexico vs Canada` (must contain a `vs` / `-` / `ընդդեմ` separator) |
+| D | date/time, e.g. `June 11, 2026 at 23:00` (your local Armenian time) |
 | E–K | the 7 players' predictions as text `x-y` (E=Գարիկ … K=Արտյոմ) |
 | L | actual result `x-y` (blank if not played) |
-| Row 26, E–K | each player's live total (cross‑check only) |
+| **M** | **(optional) stage/round label**, e.g. `Matchday 1`, `Round of 32` — used to group the grid |
 
-> ⚠️ **Do not insert or reorder rows/columns.** The script reads fixed cells (`A2:L25`, `E26:K26`).
-> Moving things will silently mis‑map data. To change player columns/names, edit `PLAYERS` in `Code.gs`.
+**The table grows downward.** The script reads from row 2 to the last filled row, so you can just
+**append** matchday 2, matchday 3, and the knockouts as new rows. A row counts as a match only if its
+matchup (C) contains a separator **or** it has an actual result (L) — so any blank or summary/totals
+rows are ignored automatically (the app computes totals itself; no totals row needed).
+
+- **Column M (stage)** is optional. Leave it blank and the grid is one ungrouped list (matchday‑1
+  behaviour). Fill it in (e.g. `Matchday 1`, `Matchday 2`, `Round of 32`) and the grid splits into
+  labelled sections with a stage selector in the toolbar.
+- **Don't reorder columns A–M or rename them mid‑season** — predictions are read from fixed columns
+  E–K and the result from L. To change player columns/names, edit `PLAYERS` in `Code.gs`.
+- Adding rows/the M column requires **redeploying `Code.gs`** once (Manage deployments → Edit → New
+  version) only if you're upgrading from an older copy; after that, appending rows needs no redeploy.
 
 ---
 

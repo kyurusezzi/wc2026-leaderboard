@@ -12,12 +12,14 @@
  * See README.md for the full deploy runbook.
  */
 
-// ===== CONFIG — the organizer edits these two lines =====================
+// ===== CONFIG ==========================================================
 // SHEET_ID is the long middle part of the sheet URL:
 //   https://docs.google.com/spreadsheets/d/<THIS_IS_THE_ID>/edit
-var SHEET_ID = 'PASTE_SPREADSHEET_ID_HERE';
-// Exact name of the tab that holds the predictions (bottom-left tab label).
-var SHEET_NAME = 'Sheet1';
+var SHEET_ID = '131cIpvgfjt2qAF-or1BYO9JWlWX3bCmDZhyRF5YRBIs';
+// The tab is selected by its gid (from the URL: ...#gid=<THIS>) — robust against
+// renames/spaces. SHEET_NAME is only a fallback if the gid isn't found.
+var SHEET_GID  = 62010908;
+var SHEET_NAME = 'Sheet 1';
 
 // Player columns E..K, in order. `col` is the 0-based offset inside an A..L row
 // (A=0, B=1, ... E=4 ... K=10, L=11). This is the single source of truth for
@@ -40,8 +42,9 @@ var TOTALS_ROW     = 26;  // sheet's live totals row
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
-    if (!sheet) throw new Error('Sheet/tab not found: "' + SHEET_NAME + '"');
+    // Prefer the exact tab by gid; fall back to name, then the first tab.
+    var sheet = getSheetByGid_(ss, SHEET_GID) || ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+    if (!sheet) throw new Error('Tab not found (gid ' + SHEET_GID + ' / name "' + SHEET_NAME + '")');
 
     // ONE rectangular read for all 24 match rows (A2:L25 = 24 rows x 12 cols).
     var grid = sheet
@@ -104,6 +107,15 @@ function json_(obj) {
 
 function str_(v) {
   return (v === null || v === undefined) ? '' : String(v).trim();
+}
+
+/** Find a tab by its gid (the #gid=... number in the sheet URL). */
+function getSheetByGid_(ss, gid) {
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === gid) return sheets[i];
+  }
+  return null;
 }
 
 /**

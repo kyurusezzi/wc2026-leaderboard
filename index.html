@@ -409,8 +409,8 @@
     // Apps Script Web App /exec URL (see README.md):
     WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyf_jhERankZUBc0JZq3LIrA-Bl-LZScAFeZtQ-JhN_ALpvVcBRSKvFGax27k3ftDMtHA/exec',
     POLL_MS: 45000,                 // live refresh cadence
-    REQUEST_TIMEOUT_MS: 12000,
-    BACKOFF_MAX_MS: 5 * 60 * 1000,
+    REQUEST_TIMEOUT_MS: 25000,      // Apps Script idles ~2-3s but can spike to 10-20s — don't abort early
+    BACKOFF_MAX_MS: 2 * 60 * 1000,  // cap retry spacing at 2 min so it never feels "stuck"
     CACHE_KEY: 'wc2026:lastGood:v1',
     STALE_AFTER_MS: 2 * 45000,      // older than 2x poll = stale
     TZ: 'Asia/Yerevan',

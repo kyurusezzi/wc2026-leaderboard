@@ -737,11 +737,12 @@
     'usa': 'united states', 'us': 'united states', 'türkiye': 'turkey', 'turkiye': 'turkey',
     'côte divoire': 'ivory coast', 'cote divoire': 'ivory coast', 'ivory coast': 'ivory coast',
     'czech republic': 'czechia', 'bosnia herzegovina': 'bosnia and herzegovina',
-    'china pr': 'china', 'ir iran': 'iran', 'curacao': 'curacao',
+    'cabo verde': 'cape verde', 'china pr': 'china', 'ir iran': 'iran', 'curacao': 'curacao',
   };
   function normTeam(name) {
     let s = String(name || '').toLowerCase().trim()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')   // strip diacritics (Türkiye -> turkiye)
+      .replace(/\s*&\s*/g, ' and ')              // "Bosnia & Herzegovina" -> "...and..."
       .replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
     return TEAM_ALIASES[s] || s;
   }

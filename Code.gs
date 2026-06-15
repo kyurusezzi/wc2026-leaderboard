@@ -164,7 +164,8 @@ var MONTHS_ = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:
 var TEAM_ALIASES = {
   'korea republic':'south korea','republic of korea':'south korea','korea dpr':'north korea',
   'usa':'united states','us':'united states','turkiye':'turkey','cote divoire':'ivory coast',
-  'czech republic':'czechia','bosnia herzegovina':'bosnia and herzegovina','china pr':'china','ir iran':'iran'
+  'czech republic':'czechia','bosnia herzegovina':'bosnia and herzegovina','cabo verde':'cape verde',
+  'china pr':'china','ir iran':'iran'
 };
 
 /** Run ONCE from the Apps Script editor to turn auto-sync on (every 10 minutes). */
@@ -288,7 +289,7 @@ function pick_(map, name) { var v = map[normTeam_(name)]; return (v == null) ? n
 function numOrNull_(v) { if (v === undefined || v === null || v === '') return null; var n = Number(v); return isNaN(n) ? null : n; }
 function normTeam_(name) {
   var s = String(name == null ? '' : name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  s = s.replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
+  s = s.replace(/\s*&\s*/g, ' and ').replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
   return TEAM_ALIASES[s] || s;
 }
 function pairKey_(a, b) { var x = [normTeam_(a), normTeam_(b)]; x.sort(); return x[0] + '~' + x[1]; }

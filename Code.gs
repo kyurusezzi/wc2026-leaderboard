@@ -289,7 +289,7 @@ function pick_(map, name) { var v = map[normTeam_(name)]; return (v == null) ? n
 function numOrNull_(v) { if (v === undefined || v === null || v === '') return null; var n = Number(v); return isNaN(n) ? null : n; }
 function normTeam_(name) {
   var s = String(name == null ? '' : name).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  s = s.replace(/\s*&\s*/g, ' and ').replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
+  s = s.replace(/\s*&\s*/g, ' and ').replace(/-/g, ' ').replace(/[.'`]/g, '').replace(/\s+/g, ' ').trim();
   return TEAM_ALIASES[s] || s;
 }
 function pairKey_(a, b) { var x = [normTeam_(a), normTeam_(b)]; x.sort(); return x[0] + '~' + x[1]; }

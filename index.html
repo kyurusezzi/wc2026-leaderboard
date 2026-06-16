@@ -296,6 +296,120 @@
     .lu-msg { padding: 40px 20px; text-align: center; color: var(--text-mid); }
     .lu-skel { padding: 60px 20px; text-align: center; color: var(--text-lo); }
 
+    /* ===== Knockout bracket (#bracket page) ===== */
+    :root { --bk-line: rgba(157,243,192,0.22); --bk-chip-h: 26px; }
+    .bk-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .bk-msg { padding: 60px 20px; text-align: center; color: var(--text-mid); }
+    .bk-msg span { color: var(--text-lo); font-size: 13px; }
+    .bk-note {
+      align-self: flex-start; font-size: 12.5px; font-weight: 600; color: var(--accent-2);
+      background: rgba(43,212,107,0.08); border: 1px solid rgba(43,212,107,0.28);
+      border-radius: 9999px; padding: 6px 12px;
+    }
+    .bk-note--live { color: #0A0F1E; background: var(--c-exact); border-color: transparent; animation: pulse 1.8s infinite; }
+    .bk-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+
+    /* team / placeholder pill — abbr on the left, circular flag on the right (per the reference image) */
+    .bk-chip {
+      display: flex; align-items: center; justify-content: space-between; gap: 7px;
+      min-width: 96px; height: var(--bk-chip-h); padding: 0 5px 0 9px; border-radius: 9999px;
+      background: linear-gradient(180deg, rgba(18,46,30,0.92), rgba(11,32,20,0.92));
+      border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+      font-size: 12px; line-height: 1; white-space: nowrap; cursor: default;
+    }
+    .bk-ab { font-weight: 800; letter-spacing: .4px; color: var(--text-hi); }
+    .bk-flag {
+      width: 18px; height: 18px; border-radius: 9999px; object-fit: cover; flex: none;
+      border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.06);
+    }
+    .bk-flag--none { background: repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 6px); }
+    .bk-score { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-2); margin-left: 2px; }
+    .bk-chip.is-proj { opacity: .82; border-style: dashed; }
+    .bk-chip.is-winner { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(43,212,107,0.45), 0 0 12px rgba(43,212,107,0.18); }
+    .bk-chip.is-winner .bk-ab { color: var(--accent-2); }
+    .bk-chip--ph { color: var(--text-lo); border-style: dashed; background: rgba(255,255,255,0.025); justify-content: center; }
+    .bk-chip--ph .bk-ab { font-weight: 600; color: var(--text-lo); }
+    .bk-chip--big { min-width: 110px; height: 30px; font-size: 13px; }
+
+    /* a match = two stacked chips */
+    .bk-match { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; position: relative; min-height: 56px; }
+
+    /* ---- desktop two-sided board ---- */
+    .bk-board { display: flex; align-items: stretch; justify-content: center; gap: 0; min-width: max-content; padding: 4px; }
+    .bk-side { display: flex; align-items: stretch; }
+    .bk-col { display: flex; flex-direction: column; min-width: 96px; }
+    .bk-side--l .bk-col { margin-right: 20px; }
+    .bk-side--r .bk-col { margin-left: 20px; }
+    .bk-side--r .bk-chip { flex-direction: row-reverse; padding: 0 9px 0 5px; }  /* mirror: flag on the left */
+
+    /* connectors — left side: each match brackets back to its two children on the left */
+    .bk-side--l .bk-col:not(:last-child) .bk-match::after {
+      content: ''; position: absolute; right: -20px; top: 50%; width: 20px; height: 2px; background: var(--bk-line);
+    }
+    .bk-side--l .bk-col:not(:first-child) .bk-match::before {
+      content: ''; position: absolute; left: -20px; top: 25%; bottom: 25%; width: 20px;
+      border: 2px solid var(--bk-line); border-right: none;
+    }
+    /* right side mirrored */
+    .bk-side--r .bk-col:not(:last-child) .bk-match::after {
+      content: ''; position: absolute; left: -20px; top: 50%; width: 20px; height: 2px; background: var(--bk-line);
+    }
+    .bk-side--r .bk-col:not(:first-child) .bk-match::before {
+      content: ''; position: absolute; right: -20px; top: 25%; bottom: 25%; width: 20px;
+      border: 2px solid var(--bk-line); border-left: none;
+    }
+
+    /* center: finalists + champion */
+    .bk-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 0 18px; min-width: 150px; }
+    .bk-finalists { display: flex; flex-direction: column; gap: 8px; }
+    .bk-champ { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .bk-champ-circle {
+      width: 84px; height: 84px; border-radius: 9999px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #173f28, #0b2114);
+      border: 3px solid var(--gold); box-shadow: 0 0 0 3px rgba(255,200,80,0.15), 0 8px 26px rgba(0,0,0,0.5);
+    }
+    .bk-champ-circle img { width: 100%; height: 100%; object-fit: cover; }
+    .bk-trophy { font-size: 34px; }
+    .bk-champ-label { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--gold); text-transform: uppercase; }
+
+    /* ---- mobile single swipe-through board ---- */
+    .bk-board--mobile { display: flex; align-items: stretch; gap: 20px; min-width: max-content; padding: 4px 2px 8px; }
+    .bk-board--mobile .bk-col { min-width: 104px; }
+    .bk-board--mobile .bk-col-h {
+      text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--accent-2); margin-bottom: 6px; flex: none;
+    }
+    .bk-board--mobile .bk-match { min-height: 48px; }
+    .bk-board--mobile .bk-col:not(:first-child):not(.bk-col--champ) .bk-match::before {
+      content: ''; position: absolute; left: -20px; top: 25%; bottom: 25%; width: 20px;
+      border: 2px solid var(--bk-line); border-right: none;
+    }
+    .bk-board--mobile .bk-col:not(:last-child) .bk-match::after {
+      content: ''; position: absolute; right: -20px; top: 50%; width: 20px; height: 2px; background: var(--bk-line);
+    }
+    .bk-col--champ { justify-content: center; align-items: center; display: flex; flex-direction: column; }
+
+    /* ---- best-thirds race panel (group-stage projection) ---- */
+    .bk-thirds { border-radius: 16px; padding: 12px 14px; }
+    .bk-thirds-h { font-size: 13px; font-weight: 800; margin-bottom: 10px; color: var(--text-hi); }
+    .bk-thirds-sub { font-size: 11px; font-weight: 600; color: var(--text-lo); }
+    .bk-thirds-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    @media (min-width: 768px) { .bk-thirds-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    .bk-third {
+      display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 10px;
+      background: rgba(255,255,255,0.025); border: 1px solid var(--border-soft); font-size: 12px; opacity: .55;
+    }
+    .bk-third.is-in { opacity: 1; border-color: rgba(43,212,107,0.4); background: rgba(43,212,107,0.08); }
+    .bk-third-pos { font-weight: 800; color: var(--text-lo); width: 16px; text-align: right; flex: none; }
+    .bk-third.is-in .bk-third-pos { color: var(--accent); }
+    .bk-third-ab { font-weight: 800; color: var(--text-hi); }
+    .bk-third-grp {
+      font-size: 10px; font-weight: 800; color: var(--accent); flex: none;
+      background: rgba(43,212,107,0.12); border-radius: 5px; padding: 1px 5px;
+    }
+    .bk-third-pts { margin-left: auto; font-size: 11px; color: var(--text-mid); white-space: nowrap; }
+
     /* ===== Reduced motion: kill ALL animation paths ===== */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -330,6 +444,12 @@
         </button>
       </div>
     </header>
+
+    <!-- ===== View nav (Leaderboard ↔ Knockout bracket) ===== -->
+    <nav id="view-nav" class="flex items-center gap-1 mb-5 glass rounded-full p-1 w-max text-sm">
+      <button class="seg-btn nav-tab rounded-full px-4 py-1.5 font-semibold" data-page="leaderboard" aria-pressed="true">🏆 Աղյուսակ</button>
+      <button class="seg-btn nav-tab rounded-full px-4 py-1.5 font-semibold" data-page="bracket" aria-pressed="false">🗺️ Փլեյ-օֆ</button>
+    </nav>
 
     <!-- ===== Mismatch banner (hidden by default) ===== -->
     <div id="mismatch-banner" class="hidden glass rounded-xl px-4 py-3 mb-5 text-sm" style="border-color:var(--c-draw);color:var(--c-draw)"></div>
@@ -381,6 +501,9 @@
       </section>
     </main>
 
+    <!-- ===== Knockout bracket page (#bracket) — rendered by renderBracket() ===== -->
+    <section id="bracket-view" class="hidden"></section>
+
     <footer class="mt-10 text-center text-xs" style="color:var(--text-lo)">
       <span id="footer-note">Տվյալները թարմացվում են ինքնաշխատ</span> · WC2026
     </footer>
@@ -425,6 +548,10 @@
     LIVE_SCORES: true,              // pull real in-play scores from ESPN (display-only)
     ESPN_SCOREBOARD: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
     ESPN_SUMMARY: 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary', // lineups
+    // --- knockout bracket (#bracket page — keyless ESPN, display-only, never scored) ---
+    ESPN_STANDINGS: 'https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings', // 12 groups → R32 projection
+    KNOCKOUT_RANGE: '20260628-20260719', // ESPN scoreboard date range that returns all 32 knockout events in ONE fetch
+    BRACKET_POLL_MS: 60000,         // bracket/standings refresh cadence while the #bracket page is open
     SHOW_LIVE_PILL: true,           // header shows "ՈՒՂԻՂ · N խաղ" when matches are in progress
     DEMO: location.search.includes('demo'),
     TEST: location.search.includes('test'),
@@ -557,6 +684,55 @@
     };
   }
 
+  /* ===== 3b. BRACKET HELPERS (pure — for the #bracket knockout page) =====
+     ESPN's knockout scoreboard encodes each unresolved slot in the competitor
+     name/abbr ("Group A Winner", "Group B 2nd Place", "Third Place Group A/B/C/D/F",
+     "Round of 32 1 Winner", …). These parse those into structured descriptors and
+     rank the third-placed teams. All pure → exercised by the ?test harness. */
+
+  // "2A" → {pos:2,group:'A'} · "1L" → {pos:1,group:'L'} · "3RD" → {pos:3,group:null} · else null
+  function parseSlotCode(code) {
+    const s = String(code == null ? '' : code).trim().toUpperCase();
+    const m = s.match(/^([12])([A-L])$/);
+    if (m) return { pos: +m[1], group: m[2] };
+    if (s === '3RD') return { pos: 3, group: null };
+    return null;
+  }
+
+  // "Third Place Group A/B/C/D/F" → ['A','B','C','D','F'] · single/none → null
+  function parsePool(name) {
+    const m = String(name == null ? '' : name).match(/Group ([A-L](?:\/[A-L])+)/i);
+    return m ? m[1].toUpperCase().split('/') : null;
+  }
+
+  // Rich descriptor for an ESPN knockout competitor placeholder. null ⇒ a real (resolved) team.
+  function parseSlotLabel(name) {
+    const s = String(name == null ? '' : name).trim();
+    let m;
+    if ((m = s.match(/^Group ([A-L]) Winner$/i))) return { kind: 'winner', group: m[1].toUpperCase() };
+    if ((m = s.match(/^Group ([A-L]) (?:2nd Place|Runner[- ]?up)$/i))) return { kind: 'runnerup', group: m[1].toUpperCase() };
+    if ((m = s.match(/^Third Place Group ([A-L/]+)$/i))) return { kind: 'third', pool: m[1].toUpperCase().split('/').filter(Boolean) };
+    if ((m = s.match(/^Round of 32 (\d+) Winner$/i))) return { kind: 'feed', refRound: 'r32', refNum: +m[1], refType: 'W' };
+    if ((m = s.match(/^Round of 16 (\d+) Winner$/i))) return { kind: 'feed', refRound: 'r16', refNum: +m[1], refType: 'W' };
+    if ((m = s.match(/^Quarterfinal (\d+) Winner$/i))) return { kind: 'feed', refRound: 'qf', refNum: +m[1], refType: 'W' };
+    if ((m = s.match(/^Semifinal (\d+) (Winner|Loser)$/i))) return { kind: 'feed', refRound: 'sf', refNum: +m[1], refType: m[2][0].toUpperCase() };
+    return null;
+  }
+
+  // The 8 best third-placed teams (FIFA order: points → goal difference → goals for).
+  // `groups` = [{ letter, entries:[{rank,pts,gd,gf,...}] }]. Marks top-8 with qualifies:true.
+  function computeBestThirds(groups) {
+    const thirds = [];
+    for (const g of groups || []) {
+      const e = (g.entries || []).find((x) => x.rank === 3);
+      if (e) thirds.push(Object.assign({}, e, { group: g.letter }));
+    }
+    thirds.sort((a, b) =>
+      (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf) || (a.group < b.group ? -1 : 1));
+    thirds.forEach((t, i) => { t.qualifies = i < 8; });
+    return thirds;
+  }
+
   /* ===== 4. TEST HARNESS (?test) =================================== */
   function runTests() {
     const results = [];
@@ -670,6 +846,34 @@
     eq('state 90m-before->soon', matchTimeState(t0, t0 - 90 * MIN, false), 'soon');     // 2h soon window
     eq('state 150m-before->upcoming', matchTimeState(t0, t0 - 150 * MIN, false), 'upcoming');
     eq('state null-kickoff->upcoming', matchTimeState(null, t0, false), 'upcoming');
+
+    // ----- bracket helpers (#bracket knockout page) -----
+    eq('slotcode 2A', parseSlotCode('2A'), { pos: 2, group: 'A' });
+    eq('slotcode 1L', parseSlotCode('1L'), { pos: 1, group: 'L' });
+    eq('slotcode 3RD', parseSlotCode('3RD'), { pos: 3, group: null });
+    eq('slotcode real', parseSlotCode('MEX'), null);
+    eq('slotcode blank', parseSlotCode(''), null);
+    eq('pool 5-way', parsePool('Third Place Group A/B/C/D/F'), ['A', 'B', 'C', 'D', 'F']);
+    eq('pool single=null', parsePool('Group A Winner'), null);
+    eq('label winner', parseSlotLabel('Group C Winner'), { kind: 'winner', group: 'C' });
+    eq('label runnerup', parseSlotLabel('Group F 2nd Place'), { kind: 'runnerup', group: 'F' });
+    eq('label third', parseSlotLabel('Third Place Group A/B/C/D/F'), { kind: 'third', pool: ['A', 'B', 'C', 'D', 'F'] });
+    eq('label feed r32', parseSlotLabel('Round of 32 1 Winner'), { kind: 'feed', refRound: 'r32', refNum: 1, refType: 'W' });
+    eq('label feed qf', parseSlotLabel('Quarterfinal 3 Winner'), { kind: 'feed', refRound: 'qf', refNum: 3, refType: 'W' });
+    eq('label feed sf loser', parseSlotLabel('Semifinal 1 Loser'), { kind: 'feed', refRound: 'sf', refNum: 1, refType: 'L' });
+    eq('label real team', parseSlotLabel('Mexico'), null);
+    const thirdsG = 'ABCDEFGHIJKL'.split('').map((L, i) => ({ letter: L, entries: [{ rank: 3, pts: 12 - i, gd: 0, gf: 0 }] }));
+    eq('thirds order by pts', computeBestThirds(thirdsG).map((t) => t.group).slice(0, 3), ['A', 'B', 'C']);
+    eq('thirds top-8 cut', computeBestThirds(thirdsG).map((t) => t.qualifies),
+      [true, true, true, true, true, true, true, true, false, false, false, false]);
+    eq('thirds gd tiebreak', computeBestThirds([
+      { letter: 'A', entries: [{ rank: 3, pts: 3, gd: 1, gf: 2 }] },
+      { letter: 'B', entries: [{ rank: 3, pts: 3, gd: 5, gf: 1 }] },
+    ]).map((t) => t.group), ['B', 'A']);
+    eq('thirds only rank3', computeBestThirds([
+      { letter: 'A', entries: [{ rank: 1, pts: 9 }, { rank: 3, pts: 3, gd: 0, gf: 0 }] },
+      { letter: 'B', entries: [{ rank: 2, pts: 6 }] },
+    ]).map((t) => t.group), ['A']);
 
     const passed = results.filter((r) => r.ok === '✅').length;
     console.log('%cWC2026 tests: ' + passed + '/' + results.length + ' passed',
@@ -794,6 +998,90 @@
         }
       }
     } finally { liveInFlight = false; }
+  }
+
+  /* ===== KNOCKOUT BRACKET DATA (ESPN — keyless, display-only) ========
+     Two feeds power the #bracket page; both fail as invisible no-ops:
+       • standings → project the still-unresolved R32 slots during the group stage
+       • scoreboard (knockout date range) → the real bracket + live/final scores
+     Neither feeds scoreOne/computeStandings — the bracket never affects scoring. */
+  function flagOf(team) {
+    if (!team) return null;
+    if (team.logos && team.logos[0] && team.logos[0].href) return team.logos[0].href; // standings shape
+    if (team.logo) return team.logo;                                                  // scoreboard shape
+    const ab = String(team.abbreviation || '').toLowerCase();
+    return ab ? ('https://a.espncdn.com/i/teamlogos/countries/500/' + ab + '.png') : null; // last-resort build
+  }
+
+  // 12 group tables → [{ letter, entries:[{name,abbr,flag,rank,pts,gd,gf,w,d,l,played}] }] | null
+  async function fetchStandings() {
+    try {
+      const json = await (await fetch(CONFIG.ESPN_STANDINGS, { mode: 'cors' })).json();
+      const groups = [];
+      for (const g of (json && json.children) || []) {
+        const letter = String(g.abbreviation || g.name || '').replace(/group\s*/i, '').trim().charAt(0).toUpperCase();
+        const entries = [];
+        for (const e of ((g.standings && g.standings.entries) || [])) {
+          const t = e.team || {};
+          const stat = (n) => { const s = (e.stats || []).find((x) => x.name === n || x.type === n); return s ? Number(s.value) : 0; };
+          entries.push({
+            name: t.displayName || t.name || '', abbr: t.abbreviation || '', flag: flagOf(t),
+            rank: stat('rank') || 0, pts: stat('points'), gd: stat('pointDifferential'), gf: stat('pointsFor'),
+            w: stat('wins'), d: stat('ties'), l: stat('losses'), played: stat('gamesPlayed'),
+          });
+        }
+        entries.sort((a, b) => (a.rank || 9) - (b.rank || 9));
+        if (letter && entries.length) groups.push({ letter: letter, entries: entries });
+      }
+      return groups.length ? groups : null;
+    } catch (_) { return null; } // invisible no-op
+  }
+
+  const KO_ROUND = { 'round-of-32': 'r32', 'round-of-16': 'r16', 'quarterfinals': 'qf', 'semifinals': 'sf', '3rd-place-match': 'third', 'final': 'final' };
+  // one ESPN competitor → a bracket slot (resolved real team, or a parsed placeholder descriptor)
+  function slotFromCompetitor(c) {
+    const t = (c && c.team) || {};
+    const name = t.displayName || t.name || '';
+    const desc = parseSlotLabel(name);          // null ⇒ a real, resolved country
+    const resolved = !desc;
+    return {
+      resolved: resolved, name: name, abbr: t.abbreviation || '',
+      flag: resolved ? flagOf(t) : null,
+      score: (c && c.score != null && c.score !== '') ? String(c.score) : null,
+      pens: (c && c.shootoutScore != null && c.shootoutScore !== '') ? String(c.shootoutScore) : null,
+      winner: !!(c && c.winner), desc: desc,
+    };
+  }
+
+  // All 32 knockout events in ONE fetch → { rounds:{r32,r16,qf,sf,third,final}, byNum } | null.
+  // Per round, events are numbered 1..N by ascending event id — verified to match ESPN's own
+  // feed-ref numbering ("Round of 32 1 Winner" …), so the bracket topology is exact.
+  async function fetchBracket() {
+    try {
+      const json = await (await fetch(CONFIG.ESPN_SCOREBOARD + '?dates=' + CONFIG.KNOCKOUT_RANGE, { mode: 'cors' })).json();
+      const rounds = { r32: [], r16: [], qf: [], sf: [], third: [], final: [] };
+      for (const ev of (json && json.events) || []) {
+        const round = KO_ROUND[(ev.season && ev.season.slug) || ''];
+        if (!round) continue;
+        const comp = (ev.competitions && ev.competitions[0]) || {};
+        const cs = comp.competitors || [];
+        const st = (ev.status && ev.status.type) || {};
+        const home = cs.find((c) => c.homeAway === 'home') || cs[0] || {};
+        const away = cs.find((c) => c.homeAway === 'away') || cs[1] || {};
+        rounds[round].push({
+          id: Number(ev.id) || 0, date: ev.date || '', venue: (comp.venue && comp.venue.fullName) || '',
+          state: st.state || 'pre', detail: (st.shortDetail || st.detail || '').replace(/\s+/g, ' ').trim(),
+          home: slotFromCompetitor(home), away: slotFromCompetitor(away),
+        });
+      }
+      const byNum = {};
+      for (const r in rounds) {
+        rounds[r].sort((a, b) => a.id - b.id);
+        byNum[r] = {};
+        rounds[r].forEach((m, i) => { m.num = i + 1; byNum[r][m.num] = m; });
+      }
+      return rounds.r32.length ? { rounds: rounds, byNum: byNum } : null;
+    } catch (_) { return null; } // invisible no-op
   }
 
   /* ===== LINEUPS (ESPN summary?event=id — keyless, display-only) ===== */
@@ -925,7 +1213,7 @@
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ===== 5. STATE → VIEW MODEL ===================================== */
-  const view = { filter: 'all', highlight: null, stage: null }; // pure view-state (no refetch)
+  const view = { filter: 'all', highlight: null, stage: null, page: 'leaderboard' }; // pure view-state (no refetch)
 
   function buildViewModel(payload) {
     const standings = computeStandings(payload);
@@ -1325,6 +1613,12 @@
   function render(state) {
     renderHeader(state);
 
+    // On the #bracket page, keep lastVM fresh (header pill) but leave the leaderboard DOM hidden.
+    if (view.page === 'bracket') {
+      if (state.data) lastVM = buildViewModel(state.data);
+      return;
+    }
+
     const configMissing = !CONFIG.DEMO && /PASTE_WEB_APP|XXXX/.test(CONFIG.WEB_APP_URL);
     if (configMissing && !state.data) {
       refs.skeleton.classList.add('hidden');
@@ -1468,6 +1762,240 @@
     document.body.classList.remove('modal-open');
   }
 
+  /* ===== 9b. RENDER: KNOCKOUT BRACKET (#bracket — display-only) =====
+     Sourced entirely from ESPN: the knockout scoreboard is the bracket skeleton
+     (auto-resolving to real teams + scores); the standings feed projects the
+     still-unresolved R32 slots during the group stage. Never touches scoring. */
+  const bracketState = { raw: null, standings: null, fetchedAt: 0, loading: false, error: false };
+  const RD_LABEL = { r32: '1/16', r16: '1/8', qf: '1/4', sf: '1/2', final: 'Եզրափակիչ', third: '3-րդ տեղ' };
+  const CHILD_ROUND = { final: 'sf', sf: 'qf', qf: 'r16', r16: 'r32' };
+
+  function standingsByLetter(standings) {
+    const o = {};
+    (standings || []).forEach((g) => { o[g.letter] = g.entries; });
+    return o;
+  }
+  function slotLabel(d) {
+    if (!d) return '—';
+    if (d.kind === 'winner') return d.group + '·1';
+    if (d.kind === 'runnerup') return d.group + '·2';
+    if (d.kind === 'third') return '3-րդ՝ ' + (d.pool || []).join('/');
+    if (d.kind === 'feed') return d.refType === 'L' ? 'Պարտվող' : 'Հաղթող';
+    return '—';
+  }
+  // one ESPN slot → a render-ready chip. Resolved → real team; placeholder 1X/2X → projected
+  // from live standings; everything else (3rd pool, feed-refs) → a neutral label chip.
+  function slotChip(slot, byLetter) {
+    if (!slot) return { kind: 'label', label: '—' };
+    if (slot.resolved) {
+      return { kind: 'team', flag: slot.flag, abbr: slot.abbr || slot.name, name: slot.name,
+        score: slot.score, pens: slot.pens, winner: slot.winner, projected: false };
+    }
+    const d = slot.desc || {};
+    if ((d.kind === 'winner' || d.kind === 'runnerup') && byLetter[d.group]) {
+      const want = d.kind === 'winner' ? 1 : 2;
+      const e = byLetter[d.group].find((x) => x.rank === want) || byLetter[d.group][want - 1];
+      if (e && e.abbr) return { kind: 'team', flag: e.flag, abbr: e.abbr, name: e.name,
+        score: null, pens: null, winner: false, projected: true };
+    }
+    return { kind: 'label', label: slotLabel(d) };
+  }
+
+  // Build ordering + left/right side for every match by DFS over the topology tree (root = final).
+  // Guarantees siblings are vertically adjacent so the CSS flex columns + connectors line up.
+  function bracketViewModel() {
+    const bd = bracketState.raw;
+    if (!bd) return null;
+    const byLetter = standingsByLetter(bracketState.standings);
+    const byNum = bd.byNum;
+    const order = {}, side = {};
+    const childOf = (slot) => { const d = slot && slot.desc; return (d && d.kind === 'feed' && byNum[d.refRound]) ? byNum[d.refRound][d.refNum] : null; };
+    let leaf = 0;
+    function dfs(m, round, sd) {
+      if (!m) return [Infinity, -Infinity];
+      side[round + '#' + m.num] = sd;
+      const hc = childOf(m.home), ac = childOf(m.away);
+      let lo, hi;
+      if (!hc && !ac) { lo = hi = leaf++; }
+      else {
+        const cr = CHILD_ROUND[round];
+        const a = dfs(hc, cr, sd), b = dfs(ac, cr, sd);
+        lo = Math.min(a[0], b[0]); hi = Math.max(a[1], b[1]);
+      }
+      order[round + '#' + m.num] = (lo + hi) / 2;
+      return [lo, hi];
+    }
+    const finalM = byNum.final && byNum.final[1];
+    let ok = false;
+    if (finalM) {
+      try {
+        dfs(childOf(finalM.home), 'sf', 'l');
+        dfs(childOf(finalM.away), 'sf', 'r');
+        order['final#1'] = (leaf - 1) / 2; side['final#1'] = 'c';
+        ok = leaf > 0;
+      } catch (_) { ok = false; }
+    }
+    function colMatches(round, wantSide) {
+      const list = (bd.rounds[round] || []).slice();
+      if (ok) {
+        list.sort((a, b) => order[round + '#' + a.num] - order[round + '#' + b.num]);
+        return wantSide ? list.filter((m) => side[round + '#' + m.num] === wantSide) : list;
+      }
+      list.sort((a, b) => a.num - b.num); // fallback: numeric order, split in half
+      if (!wantSide) return list;
+      const half = Math.ceil(list.length / 2);
+      return wantSide === 'l' ? list.slice(0, half) : list.slice(half);
+    }
+
+    const r32 = bd.rounds.r32 || [];
+    const anyProjected = r32.some((m) => !m.home.resolved || !m.away.resolved);
+    const anyLive = ['r32', 'r16', 'qf', 'sf', 'final'].some((r) => (bd.rounds[r] || []).some((m) => m.state === 'in'));
+    const finalDone = !!(finalM && finalM.state === 'post' && (finalM.home.winner || finalM.away.winner));
+    const phase = anyLive ? 'live' : (finalDone ? 'final' : (anyProjected ? 'projected' : 'scheduled'));
+
+    let champion = null;
+    if (finalM) {
+      const w = finalM.home.winner ? finalM.home : (finalM.away.winner ? finalM.away : null);
+      if (w && w.resolved) champion = slotChip(w, byLetter);
+    }
+    return { bd: bd, byLetter: byLetter, colMatches: colMatches,
+      bestThirds: computeBestThirds(bracketState.standings || []), phase: phase, champion: champion, finalM: finalM };
+  }
+
+  function fmtDateShort(iso) {
+    const t = Date.parse(iso); if (!t) return '';
+    try { return new Intl.DateTimeFormat(CONFIG.LOCALE, { timeZone: CONFIG.TZ, month: 'short', day: 'numeric' }).format(t); }
+    catch (_) { return ''; }
+  }
+  function bkChipHtml(c, opts) {
+    opts = opts || {};
+    const big = opts.big ? ' bk-chip--big' : '';
+    if (!c || c.kind !== 'team') {
+      return '<div class="bk-chip bk-chip--ph' + big + '"><span class="bk-ab">' + esc((c && c.label) || '—') + '</span></div>';
+    }
+    const flag = c.flag
+      ? '<img class="bk-flag" src="' + esc(c.flag) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+      : '<span class="bk-flag bk-flag--none"></span>';
+    const ab = esc(c.abbr || c.name || '—');
+    const sc = (c.score != null) ? '<span class="bk-score">' + esc(c.score) + (c.pens ? ' (' + esc(c.pens) + ')' : '') + '</span>' : '';
+    const cls = 'bk-chip' + big + (c.projected ? ' is-proj' : '') + (c.winner ? ' is-winner' : '');
+    const tip = c.name ? ' data-tip="' + esc(c.name + (c.projected ? ' · կանխատեսված' : '')) + '"' : '';
+    return '<div class="' + cls + ' tip"' + tip + '><span class="bk-ab">' + ab + '</span>' + flag + sc + '</div>';
+  }
+  function bkMatchHtml(m, byLetter) {
+    const tip = esc([m.venue, fmtDateShort(m.date), m.detail].filter(Boolean).join(' · '));
+    return '<div class="bk-match tip" data-tip="' + tip + '">' +
+      bkChipHtml(slotChip(m.home, byLetter)) + bkChipHtml(slotChip(m.away, byLetter)) + '</div>';
+  }
+  function bkColHtml(round, wantSide, vm) {
+    return '<div class="bk-col" data-round="' + round + '">' +
+      vm.colMatches(round, wantSide).map((m) => bkMatchHtml(m, vm.byLetter)).join('') + '</div>';
+  }
+  function champHtml(vm) {
+    const flag = vm.champion && vm.champion.flag
+      ? '<img src="' + esc(vm.champion.flag) + '" alt="">' : '<span class="bk-trophy">🏆</span>';
+    return '<div class="bk-champ"><div class="bk-champ-circle">' + flag + '</div>' +
+      '<div class="bk-champ-label">' + (vm.champion ? esc(vm.champion.abbr || vm.champion.name) : 'ՉԵՄՊԻՈՆ') + '</div></div>';
+  }
+  function renderBracketDesktop(vm) {
+    const fin = vm.finalM;
+    const center = '<div class="bk-center"><div class="bk-finalists">' +
+      bkChipHtml(slotChip(fin && fin.home, vm.byLetter), { big: true }) +
+      bkChipHtml(slotChip(fin && fin.away, vm.byLetter), { big: true }) +
+      '</div>' + champHtml(vm) + '</div>';
+    return '<div class="bk-board">' +
+      '<div class="bk-side bk-side--l">' + bkColHtml('r32', 'l', vm) + bkColHtml('r16', 'l', vm) + bkColHtml('qf', 'l', vm) + bkColHtml('sf', 'l', vm) + '</div>' +
+      center +
+      '<div class="bk-side bk-side--r">' + bkColHtml('sf', 'r', vm) + bkColHtml('qf', 'r', vm) + bkColHtml('r16', 'r', vm) + bkColHtml('r32', 'r', vm) + '</div>' +
+    '</div>';
+  }
+  function renderBracketMobile(vm) {
+    const cols = ['r32', 'r16', 'qf', 'sf', 'final'].map((round) =>
+      '<div class="bk-col" data-round="' + round + '"><div class="bk-col-h">' + RD_LABEL[round] + '</div>' +
+      vm.colMatches(round, null).map((m) => bkMatchHtml(m, vm.byLetter)).join('') + '</div>').join('');
+    return '<div class="bk-board bk-board--mobile">' + cols +
+      '<div class="bk-col bk-col--champ"><div class="bk-col-h">🏆</div>' + champHtml(vm) + '</div></div>';
+  }
+  function renderBestThirds(vm) {
+    const t = vm.bestThirds;
+    if (!t || !t.length) return '';
+    const rows = t.map((x, i) =>
+      '<div class="bk-third' + (x.qualifies ? ' is-in' : '') + '">' +
+        '<span class="bk-third-pos">' + (i + 1) + '</span>' +
+        (x.flag ? '<img class="bk-flag" src="' + esc(x.flag) + '" onerror="this.style.visibility=\'hidden\'">' : '<span class="bk-flag bk-flag--none"></span>') +
+        '<span class="bk-third-ab">' + esc(x.abbr || x.name) + '</span>' +
+        '<span class="bk-third-grp">' + esc(x.group) + '</span>' +
+        '<span class="bk-third-pts num">' + x.pts + 'մ · ' + (x.gd >= 0 ? '+' : '') + x.gd + '</span>' +
+      '</div>').join('');
+    return '<div class="bk-thirds glass"><div class="bk-thirds-h">🥉 Լավագույն 3-րդ տեղեր <span class="bk-thirds-sub">8-ը անցնում են</span></div><div class="bk-thirds-grid">' + rows + '</div></div>';
+  }
+  function renderBracket() {
+    const host = refs.bracketView;
+    if (!host) return;
+    const vm = bracketViewModel();
+    if (!vm) {
+      host.innerHTML = (bracketState.error && !bracketState.loading)
+        ? '<div class="bk-msg">📡 Բրեքեթը հասանելի չէ հիմա։<br><span>Կրկին փորձեք քիչ անց։</span></div>'
+        : '<div class="bk-msg">⚽ Բեռնում…</div>';
+      return;
+    }
+    const banner = vm.phase === 'projected'
+      ? '<div class="bk-note">🔮 Կանխատեսված ցանց · խմբային փուլի ընթացիկ դիրքերով։ Թիմերը կճշտվեն փուլի ավարտին։</div>'
+      : (vm.phase === 'live' ? '<div class="bk-note bk-note--live">● ՈՒՂԻՂ · փլեյ-օֆ</div>' : '');
+    host.innerHTML = '<div class="bk-wrap">' + banner +
+      (vm.phase === 'projected' ? renderBestThirds(vm) : '') +
+      '<div class="hidden lg:block bk-scroll">' + renderBracketDesktop(vm) + '</div>' +
+      '<div class="lg:hidden bk-scroll">' + renderBracketMobile(vm) + '</div>' +
+    '</div>';
+  }
+
+  async function ensureBracket(force) {
+    renderBracket();
+    const fresh = bracketState.fetchedAt && (Date.now() - bracketState.fetchedAt < CONFIG.BRACKET_POLL_MS);
+    if (bracketState.loading || (fresh && !force)) return;
+    bracketState.loading = true;
+    if (!bracketState.raw) renderBracket();
+    try {
+      const [bracket, standings] = await Promise.all([fetchBracket(), fetchStandings()]);
+      if (bracket) bracketState.raw = bracket;
+      if (standings) bracketState.standings = standings;
+      bracketState.fetchedAt = Date.now();
+      bracketState.error = !bracketState.raw;
+    } catch (_) { bracketState.error = !bracketState.raw; }
+    finally { bracketState.loading = false; renderBracket(); }
+  }
+
+  /* ===== Routing (#bracket ↔ leaderboard) ========================= */
+  function pageFromHash() { return /bracket/i.test(location.hash || '') ? 'bracket' : 'leaderboard'; }
+  function renderNav() {
+    if (!refs.viewNav) return;
+    refs.viewNav.querySelectorAll('[data-page]').forEach((b) =>
+      b.setAttribute('aria-pressed', String((b.dataset.page === 'bracket') === (view.page === 'bracket'))));
+  }
+  function applyRoute() {
+    const onBracket = view.page === 'bracket';
+    renderNav();
+    refs.bracketView.classList.toggle('hidden', !onBracket);
+    if (onBracket) {
+      refs.content.classList.add('hidden');
+      refs.skeleton.classList.add('hidden');
+      refs.configNeeded.classList.add('hidden');
+      refs.mismatchBanner.classList.add('hidden');
+      ensureBracket();
+    } else {
+      render(store.get()); // restore the leaderboard view + its normal gating
+    }
+  }
+  function goPage(p) {
+    const want = p === 'bracket' ? 'bracket' : 'leaderboard';
+    if (view.page === want) return;
+    view.page = want;
+    const hash = want === 'bracket' ? '#bracket' : '';
+    try { history.replaceState(null, '', hash || (location.pathname + location.search)); }
+    catch (_) { location.hash = hash; }
+    applyRoute();
+  }
+
   /* ===== 10. MAIN (wire refs · listeners · boot · poll) =========== */
   function cacheRefs() {
     Object.assign(refs, {
@@ -1481,6 +2009,7 @@
       mismatchBanner: $('#mismatch-banner'), toasts: $('#toast-container'),
       lineupOverlay: $('#lineup-overlay'), lineupCard: $('#lineup-card'),
       lineupClose: $('#lineup-close'), lineupBody: $('#lineup-body'),
+      viewNav: $('#view-nav'), bracketView: $('#bracket-view'),
     });
   }
 
@@ -1495,6 +2024,7 @@
 
   function boot() {
     cacheRefs();
+    view.page = pageFromHash();   // deep-link support: opening #bracket lands on the bracket
 
     if (CONFIG.TEST) runTests();
 
@@ -1518,6 +2048,12 @@
     setInterval(() => { const s = store.get(); if (s.fetchedAt) renderHeader(s); }, 1000); // tick "x ago" + live pill
     setInterval(retickLive, CONFIG.LIVE_RETICK_MS);  // live scores + time-state flips (grid-only)
     setTimeout(retickLive, 1500);                    // prompt first live-score pull after initial paint
+
+    // bracket page wiring (#bracket ↔ leaderboard)
+    refs.viewNav.addEventListener('click', (e) => { const b = e.target.closest('[data-page]'); if (b) goPage(b.dataset.page); });
+    window.addEventListener('hashchange', () => { view.page = pageFromHash(); applyRoute(); });
+    setInterval(() => { if (view.page === 'bracket' && !document.hidden) ensureBracket(); }, CONFIG.BRACKET_POLL_MS);
+    applyRoute();  // reflect the initial route (shows the bracket immediately on a #bracket deep-link)
 
     // lineups modal wiring
     refs.gridDesktop.addEventListener('click', onGridClick);

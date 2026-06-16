@@ -50,3 +50,18 @@ exact=**3**, correct draw (not exact)=**2**, correct win/loss side (not exact)=*
 
 ## Current state (mid-June 2026)
 Matchday 1 + 2 fixtures are in the sheet (M = `1-ին փուլ` / `2-րդ փուլ`), auto-sync trigger is enabled. **Pending:** user to re-paste `Code.gs` so the Cabo Verde + Bosnia alias fixes reach the running trigger. **Matchday 3 + knockout fixtures** to be generated later — method: ESPN scoreboard, per-group take the 2 earliest remaining games = next matchday, map ESPN names → the user's sheet spellings, convert kickoffs to Yerevan (UTC+4), output as `weekday / Group X / Home vs. Away / Month DD, YYYY at HH:MM`.
+
+## NEXT UP — knockout bracket page (requested, NOT yet built)
+The user wants a **separate, navigable page** (link/tab from the main screen) showing the **knockout bracket with REAL countries** (not "Winner A vs Runner-up C"): a **live projected** bracket during the group stage, becoming the **real** bracket once groups finish. Display-only (does not touch prediction scoring).
+
+**Research to do FIRST (the user explicitly flagged this — gather before building):**
+1. **WC2026 knockout structure + slot template.** 48 teams → **Round of 32** = 12 group winners + 12 runners-up + the **8 best third-placed teams** → R16 → QF → SF → Final. Find FIFA's official bracket: the exact mapping of each R32 slot to group positions (1A, 2B, …) and the **third-placed-teams allocation table** (which combination of the 8 qualifying thirds' groups fills which slots — a fixed FIFA lookup table). This is the load-bearing unknown.
+2. **Live standings source.** Check ESPN for a keyless WC2026 standings feed (the `summary` endpoint already returns a `standings` key; also try `site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings` or the scoreboard's `leagues[].standings`). Prefer ESPN standings (it handles FIFA tiebreakers: pts → GD → GF → head-to-head → fair play) over recomputing from column L. Also check whether ESPN exposes a ready-made **bracket/knockout** feed once teams are set (would make the "real" bracket trivial).
+3. Decide how to fill slots with real countries: map ESPN standings (1st/2nd/3rd per group + the best-8 thirds) through the slot template.
+
+**Scoping questions to raise with the user:**
+- **Live projection depth:** full projection that recomputes as results come in (incl. the messy best-thirds re-slotting) vs. simpler "fill each slot only once it's mathematically decided." The best-8-thirds logic is the hard part.
+- **Where the page lives:** keep it single-file via a hash route in `index.html` (e.g. `#bracket`, toggle sections; preferred to keep zero-build) vs. a second static file. Nav = a header link/tab.
+- **Bracket visuals:** a true SVG/CSS bracket is rough on mobile — likely a round-by-round column layout (R32 → … → Final) that collapses to a stacked list on small screens; reuse the pitch-green theme + crest logos from ESPN.
+
+**Keep invariants:** display-only, ESPN keyless + graceful no-op on failure, single-file zero-build. Reuse `normTeam`/`TEAM_ALIASES`/crest logos. Verify with a real headless render against live ESPN before shipping.

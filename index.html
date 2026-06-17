@@ -330,12 +330,24 @@
     .bk-chip--ph { color: var(--text-lo); border-style: dashed; background: rgba(255,255,255,0.025); justify-content: center; }
     .bk-chip--ph .bk-ab { font-weight: 600; color: var(--text-lo); }
     .bk-chip--big { min-width: 110px; height: 30px; font-size: 13px; }
+    /* candidate pair ("MEX / CRO" = winner of an R32 match) + quiet to-be-decided slot */
+    .bk-chip--pair { justify-content: center; gap: 4px; border-style: dashed; }
+    .bk-chip--pair .bk-ab { font-weight: 700; color: var(--text-mid); letter-spacing: .2px; }
+    .bk-slash { color: var(--text-lo); font-weight: 600; }
+    .bk-chip--tbd { min-height: var(--bk-chip-h); border-style: dashed; opacity: .5; justify-content: center; }
+    .bk-chip--tbd::after { content: '–'; color: var(--text-lo); margin: auto; }
 
-    /* a match = two stacked chips */
-    .bk-match { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; position: relative; min-height: 56px; }
+    /* a match = a boxed pair of team chips (clearly grouped, with breathing room between matches) */
+    .bk-match { flex: 1 1 0; display: flex; align-items: center; justify-content: center; position: relative; min-height: 64px; }
+    .bk-match-box {
+      width: 100%; display: flex; flex-direction: column; gap: 5px; padding: 5px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(8,22,14,0.55); box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+    }
+    .bk-match-box .bk-chip { width: 100%; min-width: 0; background: rgba(255,255,255,0.035); border-color: var(--border-soft); }
 
     /* ---- desktop two-sided board ---- */
-    .bk-board { display: flex; align-items: stretch; justify-content: center; gap: 0; min-width: max-content; padding: 4px; }
+    .bk-board { display: flex; align-items: stretch; justify-content: center; gap: 0; min-width: max-content; min-height: 760px; padding: 4px; }
     .bk-side { display: flex; align-items: stretch; }
     .bk-col { display: flex; flex-direction: column; min-width: 96px; }
     .bk-side--l .bk-col { margin-right: 20px; }
@@ -374,13 +386,13 @@
     .bk-champ-label { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--gold); text-transform: uppercase; }
 
     /* ---- mobile single swipe-through board ---- */
-    .bk-board--mobile { display: flex; align-items: stretch; gap: 20px; min-width: max-content; padding: 4px 2px 8px; }
-    .bk-board--mobile .bk-col { min-width: 104px; }
+    .bk-board--mobile { display: flex; align-items: stretch; gap: 20px; min-width: max-content; min-height: 1200px; padding: 4px 2px 8px; }
+    .bk-board--mobile .bk-col { min-width: 116px; }
     .bk-board--mobile .bk-col-h {
       text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
       color: var(--accent-2); margin-bottom: 6px; flex: none;
     }
-    .bk-board--mobile .bk-match { min-height: 48px; }
+    .bk-board--mobile .bk-match { min-height: 58px; }
     .bk-board--mobile .bk-col:not(:first-child):not(.bk-col--champ) .bk-match::before {
       content: ''; position: absolute; left: -20px; top: 25%; bottom: 25%; width: 20px;
       border: 2px solid var(--bk-line); border-right: none;
@@ -1858,7 +1870,7 @@
       const w = finalM.home.winner ? finalM.home : (finalM.away.winner ? finalM.away : null);
       if (w && w.resolved) champion = slotChip(w, byLetter);
     }
-    return { bd: bd, byLetter: byLetter, colMatches: colMatches,
+    return { bd: bd, byLetter: byLetter, byNum: byNum, colMatches: colMatches,
       bestThirds: computeBestThirds(bracketState.standings || []), phase: phase, champion: champion, finalM: finalM };
   }
 
@@ -1867,29 +1879,70 @@
     try { return new Intl.DateTimeFormat(CONFIG.LOCALE, { timeZone: CONFIG.TZ, month: 'short', day: 'numeric' }).format(t); }
     catch (_) { return ''; }
   }
-  function bkChipHtml(c, opts) {
+  // Resolve a slot → a projected team object (or null). Shared by the chip + the candidate-pair labels.
+  function projTeam(slot, vm) {
+    if (!slot) return null;
+    if (slot.resolved) return { flag: slot.flag, abbr: slot.abbr || slot.name, name: slot.name, score: slot.score, pens: slot.pens, winner: slot.winner, projected: false };
+    const d = slot.desc || {};
+    if ((d.kind === 'winner' || d.kind === 'runnerup') && vm.byLetter[d.group]) {
+      const want = d.kind === 'winner' ? 1 : 2;
+      const e = vm.byLetter[d.group].find((x) => x.rank === want) || vm.byLetter[d.group][want - 1];
+      if (e && e.abbr) return { flag: e.flag, abbr: e.abbr, name: e.name, score: null, pens: null, winner: false, projected: true };
+    }
+    return null;
+  }
+  function shortName(slot, vm) {
+    const t = projTeam(slot, vm);
+    if (t) return t.abbr;
+    const d = (slot && slot.desc) || {};
+    if (d.kind === 'winner') return d.group + '1';
+    if (d.kind === 'runnerup') return d.group + '2';
+    if (d.kind === 'third') return '3rd';
+    return '?';
+  }
+  // Slot → render-ready cell. Feed-refs into the R32 become the two candidate teams ("MEX / CRO");
+  // deeper feed-refs stay a quiet TBD so the group-stage bracket isn't a wall of "Winner" chips.
+  function cellOf(slot, vm) {
+    if (!slot) return { kind: 'tbd' };
+    const t = projTeam(slot, vm);
+    if (t) return Object.assign({ kind: 'team' }, t);
+    const d = slot.desc || {};
+    if (d.kind === 'third') return { kind: 'label', label: '3-րդ՝ ' + (d.pool || []).join('/') };
+    if (d.kind === 'feed' && d.refRound === 'r32' && vm.byNum.r32 && vm.byNum.r32[d.refNum]) {
+      const src = vm.byNum.r32[d.refNum];
+      return { kind: 'pair', a: shortName(src.home, vm), b: shortName(src.away, vm) };
+    }
+    return { kind: 'tbd' };
+  }
+  function bkCellHtml(c, opts) {
     opts = opts || {};
     const big = opts.big ? ' bk-chip--big' : '';
-    if (!c || c.kind !== 'team') {
-      return '<div class="bk-chip bk-chip--ph' + big + '"><span class="bk-ab">' + esc((c && c.label) || '—') + '</span></div>';
+    if (c.kind === 'team') {
+      const flag = c.flag
+        ? '<img class="bk-flag" src="' + esc(c.flag) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+        : '<span class="bk-flag bk-flag--none"></span>';
+      const sc = (c.score != null) ? '<span class="bk-score">' + esc(c.score) + (c.pens ? ' (' + esc(c.pens) + ')' : '') + '</span>' : '';
+      const cls = 'bk-chip' + big + (c.projected ? ' is-proj' : '') + (c.winner ? ' is-winner' : '');
+      const tip = c.name ? ' data-tip="' + esc(c.name + (c.projected ? ' · կանխատեսված' : '')) + '"' : '';
+      return '<div class="' + cls + ' tip"' + tip + '><span class="bk-ab">' + esc(c.abbr || c.name || '—') + '</span>' + flag + sc + '</div>';
     }
-    const flag = c.flag
-      ? '<img class="bk-flag" src="' + esc(c.flag) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
-      : '<span class="bk-flag bk-flag--none"></span>';
-    const ab = esc(c.abbr || c.name || '—');
-    const sc = (c.score != null) ? '<span class="bk-score">' + esc(c.score) + (c.pens ? ' (' + esc(c.pens) + ')' : '') + '</span>' : '';
-    const cls = 'bk-chip' + big + (c.projected ? ' is-proj' : '') + (c.winner ? ' is-winner' : '');
-    const tip = c.name ? ' data-tip="' + esc(c.name + (c.projected ? ' · կանխատեսված' : '')) + '"' : '';
-    return '<div class="' + cls + ' tip"' + tip + '><span class="bk-ab">' + ab + '</span>' + flag + sc + '</div>';
+    if (c.kind === 'pair') {
+      return '<div class="bk-chip bk-chip--pair' + big + ' tip" data-tip="Հաղթող · ' + esc(c.a + ' / ' + c.b) + '" tabindex="0">' +
+        '<span class="bk-ab">' + esc(c.a) + '</span><span class="bk-slash">/</span><span class="bk-ab">' + esc(c.b) + '</span></div>';
+    }
+    if (c.kind === 'label') {
+      return '<div class="bk-chip bk-chip--ph' + big + '"><span class="bk-ab">' + esc(c.label || '—') + '</span></div>';
+    }
+    return '<div class="bk-chip bk-chip--tbd' + big + '"></div>';
   }
-  function bkMatchHtml(m, byLetter) {
+  function bkMatchHtml(m, vm) {
     const tip = esc([m.venue, fmtDateShort(m.date), m.detail].filter(Boolean).join(' · '));
-    return '<div class="bk-match tip" data-tip="' + tip + '">' +
-      bkChipHtml(slotChip(m.home, byLetter)) + bkChipHtml(slotChip(m.away, byLetter)) + '</div>';
+    return '<div class="bk-match"><div class="bk-match-box tip" data-tip="' + tip + '">' +
+      bkCellHtml(cellOf(m.home, vm)) + bkCellHtml(cellOf(m.away, vm)) + '</div></div>';
   }
   function bkColHtml(round, wantSide, vm) {
     return '<div class="bk-col" data-round="' + round + '">' +
-      vm.colMatches(round, wantSide).map((m) => bkMatchHtml(m, vm.byLetter)).join('') + '</div>';
+      vm.colMatches(round, wantSide).map((m) => bkMatchHtml(m, vm)).join('') + '</div>';
   }
   function champHtml(vm) {
     const flag = vm.champion && vm.champion.flag
@@ -1900,8 +1953,8 @@
   function renderBracketDesktop(vm) {
     const fin = vm.finalM;
     const center = '<div class="bk-center"><div class="bk-finalists">' +
-      bkChipHtml(slotChip(fin && fin.home, vm.byLetter), { big: true }) +
-      bkChipHtml(slotChip(fin && fin.away, vm.byLetter), { big: true }) +
+      bkCellHtml(cellOf(fin && fin.home, vm), { big: true }) +
+      bkCellHtml(cellOf(fin && fin.away, vm), { big: true }) +
       '</div>' + champHtml(vm) + '</div>';
     return '<div class="bk-board">' +
       '<div class="bk-side bk-side--l">' + bkColHtml('r32', 'l', vm) + bkColHtml('r16', 'l', vm) + bkColHtml('qf', 'l', vm) + bkColHtml('sf', 'l', vm) + '</div>' +
@@ -1912,7 +1965,7 @@
   function renderBracketMobile(vm) {
     const cols = ['r32', 'r16', 'qf', 'sf', 'final'].map((round) =>
       '<div class="bk-col" data-round="' + round + '"><div class="bk-col-h">' + RD_LABEL[round] + '</div>' +
-      vm.colMatches(round, null).map((m) => bkMatchHtml(m, vm.byLetter)).join('') + '</div>').join('');
+      vm.colMatches(round, null).map((m) => bkMatchHtml(m, vm)).join('') + '</div>').join('');
     return '<div class="bk-board bk-board--mobile">' + cols +
       '<div class="bk-col bk-col--champ"><div class="bk-col-h">🏆</div>' + champHtml(vm) + '</div></div>';
   }

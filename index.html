@@ -1050,6 +1050,23 @@
   }
 
   const KO_ROUND = { 'round-of-32': 'r32', 'round-of-16': 'r16', 'quarterfinals': 'qf', 'semifinals': 'sf', '3rd-place-match': 'third', 'final': 'final' };
+  // FIFA match number for each ESPN knockout event id (the WC2026 schedule is fixed).
+  // CRITICAL: ESPN's "Round of 32 N Winner" feed-refs are numbered by FIFA match order, NOT by
+  // event-id order — the two differ (e.g. id-order #2 = FIFA 76, but ESPN "R32 2" = FIFA 74). So we
+  // map id → FIFA → per-round ordinal to wire the topology correctly. (verified vs core-API matchNumber.)
+  const KO_EVENT_FIFA = {
+    760486: 73, 760487: 76, 760488: 75, 760489: 74, 760490: 78, 760491: 79, 760492: 77, 760493: 82,
+    760494: 81, 760495: 80, 760496: 83, 760497: 84, 760498: 85, 760499: 88, 760500: 86, 760501: 87,
+    760502: 90, 760503: 89, 760504: 91, 760505: 92, 760506: 93, 760507: 94, 760508: 96, 760509: 95,
+    760510: 97, 760511: 98, 760512: 99, 760513: 100, 760514: 101, 760515: 102, 760516: 103, 760517: 104,
+  };
+  const KO_FIFA_BASE = { r32: 72, r16: 88, qf: 96, sf: 100, third: 102, final: 103 };
+  // Official feed-forward (FIFA match number → [home child FIFA, away child FIFA]); home/away order
+  // matches ESPN's own home/away, so the rendered tree keeps the correct sides.
+  const KO_FEED = {
+    89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80], 93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
+    97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96], 101: [97, 98], 102: [99, 100], 103: [101, 102], 104: [101, 102],
+  };
   // one ESPN competitor → a bracket slot (resolved real team, or a parsed placeholder descriptor)
   function slotFromCompetitor(c) {
     const t = (c && c.team) || {};
@@ -1086,13 +1103,18 @@
           home: slotFromCompetitor(home), away: slotFromCompetitor(away),
         });
       }
-      const byNum = {};
+      // Number each round by FIFA match order (id → FIFA → ordinal), NOT event-id order.
+      const byNum = {}, byFifa = {};
       for (const r in rounds) {
-        rounds[r].sort((a, b) => a.id - b.id);
         byNum[r] = {};
-        rounds[r].forEach((m, i) => { m.num = i + 1; byNum[r][m.num] = m; });
+        for (const m of rounds[r]) {
+          m.fifa = KO_EVENT_FIFA[m.id] || null;
+          m.num = (m.fifa != null) ? (m.fifa - KO_FIFA_BASE[r]) : null;
+          if (m.num != null) { byNum[r][m.num] = m; byFifa[m.fifa] = m; }
+        }
+        rounds[r].sort((a, b) => (a.num || 99) - (b.num || 99)); // display order = match order
       }
-      return rounds.r32.length ? { rounds: rounds, byNum: byNum } : null;
+      return rounds.r32.length ? { rounds: rounds, byNum: byNum, byFifa: byFifa } : null;
     } catch (_) { return null; } // invisible no-op
   }
 
@@ -1813,20 +1835,58 @@
     return { kind: 'label', label: slotLabel(d) };
   }
 
+  // Assign the 8 best third-placed teams to the 8 "winner vs 3rd" R32 slots (each slot has a pool of
+  // eligible groups). A valid bipartite matching — fills the bracket with real teams like the
+  // reference graphics. (Provisional: respects FIFA's group constraints; ESPN confirms the exact
+  // assignment when the group stage ends.)
+  function matchThirds(hosts, qual) {
+    const idx = hosts.map((h, i) => i).sort((a, b) => hosts[a].pool.length - hosts[b].pool.length);
+    const used = new Array(qual.length).fill(false), res = new Array(hosts.length).fill(null);
+    function bt(k) {
+      if (k === idx.length) return true;
+      const hi = idx[k], pool = hosts[hi].pool;
+      for (let j = 0; j < qual.length; j++) {
+        if (!used[j] && pool.indexOf(qual[j].group) >= 0) {
+          used[j] = true; res[hi] = qual[j];
+          if (bt(k + 1)) return true;
+          used[j] = false; res[hi] = null;
+        }
+      }
+      return false;
+    }
+    return bt(0) ? res : null;
+  }
+  function allocateThirds(bd, thirds) {
+    const hosts = [];
+    for (const m of (bd.rounds.r32 || [])) {
+      for (const s of [m.home, m.away]) {
+        if (s.desc && s.desc.kind === 'third') { s.projThird = null; hosts.push({ slot: s, pool: s.desc.pool || [] }); }
+      }
+    }
+    const qual = (thirds || []).filter((t) => t.qualifies && t.abbr);
+    if (!hosts.length || qual.length < hosts.length) return;
+    const res = matchThirds(hosts, qual);
+    if (!res) return;
+    res.forEach((t, i) => { if (t) hosts[i].slot.projThird = { flag: t.flag, abbr: t.abbr, name: t.name }; });
+  }
+
   // Build ordering + left/right side for every match by DFS over the topology tree (root = final).
   // Guarantees siblings are vertically adjacent so the CSS flex columns + connectors line up.
   function bracketViewModel() {
     const bd = bracketState.raw;
     if (!bd) return null;
     const byLetter = standingsByLetter(bracketState.standings);
-    const byNum = bd.byNum;
+    const thirds = computeBestThirds(bracketState.standings || []);
+    allocateThirds(bd, thirds);   // fill the 8 third-place slots with projected teams
+    const byNum = bd.byNum, byFifa = bd.byFifa || {};
     const order = {}, side = {};
-    const childOf = (slot) => { const d = slot && slot.desc; return (d && d.kind === 'feed' && byNum[d.refRound]) ? byNum[d.refRound][d.refNum] : null; };
+    // children via the fixed feed-forward by FIFA number (KO_FEED[fifa] = [homeChild, awayChild])
+    const childOf = (m, which) => { const k = m && KO_FEED[m.fifa]; return k ? (byFifa[k[which]] || null) : null; };
     let leaf = 0;
     function dfs(m, round, sd) {
       if (!m) return [Infinity, -Infinity];
       side[round + '#' + m.num] = sd;
-      const hc = childOf(m.home), ac = childOf(m.away);
+      const hc = childOf(m, 0), ac = childOf(m, 1);
       let lo, hi;
       if (!hc && !ac) { lo = hi = leaf++; }
       else {
@@ -1841,8 +1901,8 @@
     let ok = false;
     if (finalM) {
       try {
-        dfs(childOf(finalM.home), 'sf', 'l');
-        dfs(childOf(finalM.away), 'sf', 'r');
+        dfs(childOf(finalM, 0), 'sf', 'l');
+        dfs(childOf(finalM, 1), 'sf', 'r');
         order['final#1'] = (leaf - 1) / 2; side['final#1'] = 'c';
         ok = leaf > 0;
       } catch (_) { ok = false; }
@@ -1871,7 +1931,7 @@
       if (w && w.resolved) champion = slotChip(w, byLetter);
     }
     return { bd: bd, byLetter: byLetter, byNum: byNum, colMatches: colMatches,
-      bestThirds: computeBestThirds(bracketState.standings || []), phase: phase, champion: champion, finalM: finalM };
+      bestThirds: thirds, phase: phase, champion: champion, finalM: finalM };
   }
 
   function fmtDateShort(iso) {
@@ -1883,6 +1943,7 @@
   function projTeam(slot, vm) {
     if (!slot) return null;
     if (slot.resolved) return { flag: slot.flag, abbr: slot.abbr || slot.name, name: slot.name, score: slot.score, pens: slot.pens, winner: slot.winner, projected: false };
+    if (slot.projThird) return { flag: slot.projThird.flag, abbr: slot.projThird.abbr, name: slot.projThird.name, score: null, pens: null, winner: false, projected: true };
     const d = slot.desc || {};
     if ((d.kind === 'winner' || d.kind === 'runnerup') && vm.byLetter[d.group]) {
       const want = d.kind === 'winner' ? 1 : 2;
